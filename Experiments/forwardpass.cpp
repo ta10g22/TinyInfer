@@ -41,6 +41,14 @@ vector<vector<float>> &Relu(vector<vector<float>> &output1)
 }
 
 // function for Softmax layer
+// softmax
+vector<vector<float>> Softmax(vector<vector<float>> softmax_input_mat)
+{
+    for (size_t i = 0; i < size(softmax_input_mat); i++)
+    {
+        /* code */
+    }
+}
 
 // function for Argmax layer
 
