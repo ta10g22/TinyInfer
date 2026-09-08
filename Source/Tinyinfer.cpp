@@ -6,32 +6,39 @@
 #include <unordered_map>
 #include <cstdint>
 #include <cstring>
+#include <chrono>
 
 #include <onnx/onnx_pb.h>
 
 #include "Kernels.h"
-
-
 using namespace std;
 
-//Creating a tensor class
+// tensor class
 class Tensor{
     private:
-    string name;
     vector<float> tensor_vector;
     vector<int64_t> tensor_dimension;
 
     public:
     //constructor to set tensor fields
-    Tensor(string name, vector<float> tensor_vector, vector<int64_t> tensor_dimension){
-        this-> name = name;
+    Tensor(vector<float> tensor_vector, vector<int64_t> tensor_dimension){
         this-> tensor_vector = tensor_vector;
         this-> tensor_dimension = tensor_dimension;
     }
 
-    // 2 "const" first one ensure the caller doesn't change the vector while the last one ensure the function doesn't change any member variable of the object
-    const vector<float>& get_tensor_vector() const{
+    // there are 2 "const" first one ensure the caller doesn't change the vector while the last one ensure the 
+    //function doesn't change any member variable of the object
+    const vector<float>& get_const_tensor_vector() const{
         return this->tensor_vector;
+    }
+
+    //another getter function for kernels to modify in place
+    vector<float>& get_tensor_vector(){
+        return this->tensor_vector;
+    }
+
+    const vector<int64_t>& get_tensor_dimension() const{
+        return this->tensor_dimension;
     }
 };
 
@@ -60,6 +67,7 @@ int main() {
 
     if(!modelproto.ParseFromIstream(&model_file)){
         cerr << "failed to parse ONNX model\n";
+
         return 1;
     }
 
@@ -70,7 +78,6 @@ int main() {
             return 1;
         }
     }
-
 
     //map weight names to weight tensors
     unordered_map<string,Tensor> Tensor_map;
@@ -103,32 +110,92 @@ int main() {
         }
 
         //copy content of address "weight" from raw_data start, size to copy "float"
-        for(int j = 0; j < number_of_weights + 0 ; j++){
+        for(int j = 0; j < number_of_weights; j++){
             float weight ;
             memcpy(&weight, raw_data.data() + (j * sizeof(float)), sizeof(float));
             Tensor_vector.push_back(weight);
         }
 
         //Add the Name and Tensor to the Map (names are unique so no need to check if already in)
-        Tensor_map.insert({Name, Tensor(Name, Tensor_vector, Tensor_dimension)});
+        Tensor_map.insert({Name, Tensor(Tensor_vector, Tensor_dimension)});
     }   
 
     // maybe print to see what values i get out (loop through map we map)
     for (const auto &tensor_pair : Tensor_map){
         cout << "\n" << tensor_pair.first << ":" ;
 
-        const vector<float>& Tensor_vector = tensor_pair.second.get_tensor_vector();
+        const vector<float>& Tensor_vector = tensor_pair.second.get_const_tensor_vector();
 
         for(int x = 0; x < Tensor_vector.size(); x++){
             cout << Tensor_vector[x] << ", " ;
         }
     }
     
-    // call kernels from Kernel.h and time output
+    // add input tensor for model (hardcoded for now)(mayber parsed from a CSV in near future)
+    Tensor input_tensor({0.5f, -1.2f, 0.8f, 2.0f}, {1, 4});
+    Tensor_map.insert({"input",input_tensor});
 
+    // call kernels from Kernel.h and time output (loop through)
+    auto inference_start = chrono::steady_clock::now();
+
+    for(int i =0; i < modelproto.graph().node_size(); i++){ 
+        if (modelproto.graph().node(i).op_type() == "Gemm") {
+            string input = modelproto.graph().node(i).input(0);
+            string weight = modelproto.graph().node(i).input(1);
+            string bias = modelproto.graph().node(i).input(2);
+            string output = modelproto.graph().node(i).output(0);
+            
+            vector<int64_t> dim = {Tensor_map.at(input).get_tensor_dimension()[0], Tensor_map.at(weight).get_tensor_dimension()[0]};
+            
+            vector<float> output_vector = GEMM(Tensor_map.at(input).get_tensor_vector(), Tensor_map.at(input).get_tensor_dimension(),
+            Tensor_map.at(weight).get_tensor_vector(),Tensor_map.at(weight).get_tensor_dimension(), Tensor_map.at(bias).get_tensor_vector());
+            
+            Tensor_map.insert({output, Tensor(output_vector, dim)}); ;
+        }
+
+        else if (modelproto.graph().node(i).op_type() == "Relu"){
+            string input = modelproto.graph().node(i).input(0);
+            string output = modelproto.graph().node(i).output(0);
+
+            vector<float> output_vector = Tensor_map.at(input).get_const_tensor_vector();
+
+            ReLU(output_vector);
+
+            vector<int64_t> dim = Tensor_map.at(input).get_tensor_dimension();
+
+            Tensor_map.insert({output, Tensor(output_vector, dim)});
+         }
+
+        else if (modelproto.graph().node(i).op_type() == "Softmax"){
+            string input = modelproto.graph().node(i).input(0);
+            string output = modelproto.graph().node(i).output(0);
+
+            vector<float> output_vector = Tensor_map.at(input).get_const_tensor_vector();
+
+            Softmax(output_vector, Tensor_map.at(input).get_tensor_dimension());
+
+            vector<int64_t> dim = Tensor_map.at(input).get_tensor_dimension();
+
+            Tensor_map.insert({output, Tensor(output_vector, dim)});
+        }
+    }
+    
+    auto inference_duration = chrono::duration<double, micro>(chrono::steady_clock::now() - inference_start).count() ;
+     
     // validate correctness
+    string final_output_name = modelproto.graph().output(0).name();
+    const vector<float> final_output  = Tensor_map.at(final_output_name).get_const_tensor_vector();
 
     //benchmark performance against maybe ONNX runtime
 
+    //print results
+    cout << "inference time :" <<inference_duration << "microseconds" <<'\n';
+
+    for(int i; i < x; i++){
+        if (){
+            cout << "\n";
+        }
+        cout << final_output[i] << ',' ;
+    }
     return 0;
 }
