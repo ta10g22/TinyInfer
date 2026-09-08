@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <cstring>
 #include <chrono>
+#include <cmath>
 
 #include <onnx/onnx_pb.h>
 
@@ -186,16 +187,35 @@ int main() {
     string final_output_name = modelproto.graph().output(0).name();
     const vector<float> final_output  = Tensor_map.at(final_output_name).get_const_tensor_vector();
 
-    //benchmark performance against maybe ONNX runtime
+    //open csv file of model results
+    ifstream pytorch_output("Models/pytorch_output.csv");
+
+    if (!pytorch_output.is_open()){
+        cerr << "pytorch_output file failed to open" << '\n' ;
+        return 1;
+    }
+    
+    //read each comma separated value
+    vector<float> expected_output;
+    string value;
+
+    while(getline(pytorch_output, value, ',')){
+        expected_output.push_back(stof(value));
+    };
+
+    // check if it passed 
+    for(int i = 0; i < final_output.size(); i++){
+        if (abs(expected_output[i] - final_output[i]) > 0.001f){
+            cerr << "Final output doesn't match the expected output, sorry!" << "\n";
+        }
+    }
+    //passed successfully
+    cout << "Final Output and model output match successfully" <<'\n';
 
     //print results
     cout << "inference time :" <<inference_duration << "microseconds" <<'\n';
 
-    for(int i; i < x; i++){
-        if (){
-            cout << "\n";
-        }
-        cout << final_output[i] << ',' ;
-    }
+    //benchmark performance against maybe ONNX runtime
+
     return 0;
 }
