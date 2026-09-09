@@ -25,8 +25,8 @@ int main() {
     setofkernels.insert("Relu");
     setofkernels.insert("Softmax");
 
-    //store the path of the model tinyinfer will use
-    string model_path = "Models/tiny_mlp.onnx";
+    //store the path of the model tinyinfer will use.  <----- LOAD MODEL
+    string model_path = "Models/large_mlp.onnx";
 
     //open ONNX file for reading in binary mode
     ifstream model_file(model_path, ios::binary);
@@ -56,60 +56,15 @@ int main() {
     //map weight names to weight tensors
     unordered_map<string,Tensor> Tensor_map;
 
-    //loop through the initializer collection of tensors(weights) and store them in a map
-    for(int i = 0; i < modelproto.graph().initializer_size(); i++){
-
-        string Name = modelproto.graph().initializer(i).name();
-        int64_t number_of_weights = 1;
-        vector<int64_t> Tensor_dimension;
-        vector<float> Tensor_vector ={};
-        string raw_data = modelproto.graph().initializer(i).raw_data();
-
-        //check that the weight data type is a float
-        if(modelproto.graph().initializer(i).data_type() != onnx::TensorProto::FLOAT){
-            cerr << "TinyInfer only supports FLOAT tensors\n";
-            return 1;
-        }
-
-        //find number of weights in initializer and the tensor dimension vector 
-        for(int j = 0; j < modelproto.graph().initializer(i).dims_size(); j++){
-            number_of_weights *= modelproto.graph().initializer(i).dims(j);
-            Tensor_dimension.push_back(modelproto.graph().initializer(i).dims(j));
-        }   
-
-        //saftey check to ensure model has the right number of data per tensor
-        if(raw_data.size() != number_of_weights * sizeof(float)){
-            cerr << "Number of raw datapoints != number of weights " ;
-            return 1;
-        }
-
-        //copy content of address "weight" from raw_data start, size to copy "float"
-        for(int j = 0; j < number_of_weights; j++){
-            float weight ;
-            memcpy(&weight, raw_data.data() + (j * sizeof(float)), sizeof(float));
-            Tensor_vector.push_back(weight);
-        }
-
-        //Add the Name and Tensor to the Map (names are unique so no need to check if already in)
-        Tensor_map.insert({Name, Tensor(Tensor_vector, Tensor_dimension)});
-    }   
-
-    // maybe print to see what values i get out (loop through map we map)
-    for (const auto &tensor_pair : Tensor_map){
-        cout << "\n" << tensor_pair.first << ":" ;
-
-        const vector<float>& Tensor_vector = tensor_pair.second.get_const_tensor_vector();
-
-        for(int x = 0; x < Tensor_vector.size(); x++){
-            cout << Tensor_vector[x] << ", " ;
-        }
+    //load weights for onnx model into the  tensor map so we can run inference using our optimized kernels
+    if(!load_weights(modelproto, Tensor_map)){
+        return 1;
     }
-    
-    cout << '\n' ;
-
-    // add input tensor for model (hardcoded for now)(mayber parsed from a CSV in near future)
-    Tensor input_tensor({0.5f, -1.2f, 0.8f, 2.0f}, {1, 4});
-    Tensor_map.insert({"input",input_tensor});
+                        
+    // Load the input tensor before running inference.   <------parse input for the model you're doing inference on!
+    if(!load_input(modelproto, Tensor_map)){
+    return 1;
+    }
 
     //warm up (to ensure code and data are already in CPU caches
     for(int i = 0; i < 100; i++){

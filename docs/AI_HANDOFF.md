@@ -1,5 +1,24 @@
 # AI Handoff
 
+## Input Loader Helper (2026-09-09)
+- Added bool load_input(modelproto, Tensor_map) to Source/helpers.cpp and declared it in Headers/helpers.h.
+- Reads Models/model_input.csv into a Tensor using the model's single fixed input shape and name; checks file opening, positive dimensions and value count before inserting.
+- User requested call-site code separately; Source/Tinyinfer.cpp still has an incomplete input block referencing an undeclared input_tensor. Replace that block with if(!load_input(modelproto, Tensor_map)){ return 1; } before warm-ups.
+- Syntax check passed: g++ -std=c++20 -IHeaders -I/Users/admin/vcpkg/installed/arm64-osx/include -DONNX_NAMESPACE=onnx -DONNX_ML=1 -fsyntax-only Source/helpers.cpp.
+- Full executable was not built or run. Malformed CSV conversion still uses stof exceptions; dynamic shapes and multiple model inputs are unsupported.
+- Files touched: Source/helpers.cpp, Headers/helpers.h, docs/AI_HANDOFF.md.
+
+## Restored Large MLP Rows (2026-09-09)
+- Restored the 12 missing large_mlp benchmark rows at the user's request (32x256, 10,000 iterations, no measurements).
+- Existing tiny_mlp rows were left as found; their earlier baseline and O3 measurements are now blank in the CSV.
+- Files touched: Benchmarks/results.csv and docs/AI_HANDOFF.md. Read CSV with sed, then applied the restoration patch. No model or benchmark execution changes.
+
+## Large MLP Benchmark Skeleton (2026-09-09)
+- Added large_mlp rows for each existing benchmark variant with planned input shape 32x256 and 10,000 iterations. Measurement fields remain blank.
+- Preserved all tiny_mlp rows and measurements. Large-model speedups must use the large-model baseline.
+- User will create the model themselves; no model or runtime files changed.
+- Files touched: Benchmarks/results.csv and docs/AI_HANDOFF.md. Read CSV with sed and applied additions using apply_patch.
+
 ## Latest O3 Result
 - Recorded the user's latest reported O3 average: 2.62761 microseconds over 10,000 iterations; the user reported the PyTorch comparison passed.
 - Speedup versus the 13.4596-microsecond unoptimized baseline is 5.12237.

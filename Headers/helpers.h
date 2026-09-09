@@ -38,6 +38,11 @@ class Tensor{
 };
 
 // Implementation stays in helpers.cpp.
+bool load_input(
+    const onnx::ModelProto& modelproto,
+    std::unordered_map<std::string, Tensor>& Tensor_map
+);
+
 void run_graph(
     const onnx::ModelProto& modelproto,
     std::unordered_map<std::string, Tensor>& Tensor_map
