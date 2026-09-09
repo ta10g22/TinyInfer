@@ -26,7 +26,7 @@ bool load_weights(const onnx::ModelProto& modelproto, unordered_map<string, Tens
         //check that the weight data type is a float
         if(modelproto.graph().initializer(i).data_type() != onnx::TensorProto::FLOAT){
             cerr << "TinyInfer only supports FLOAT tensors\n";
-            return 1;
+            return false;
         }
 
         //find number of weights in initializer and the tensor dimension vector 
@@ -38,7 +38,7 @@ bool load_weights(const onnx::ModelProto& modelproto, unordered_map<string, Tens
         //saftey check to ensure model has the right number of data per tensor
         if(raw_data.size() != number_of_weights * sizeof(float)){
             cerr << "Number of raw datapoints != number of weights " ;
-            return 1;
+            return false;
         }
 
         //copy content of address "weight" from raw_data start, size to copy "float"

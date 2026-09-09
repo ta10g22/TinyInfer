@@ -37,6 +37,11 @@ class Tensor{
     }
 };
 
+bool load_weights(
+    const onnx::ModelProto& modelproto,
+    unordered_map<string, Tensor>& Tensor_map
+);
+
 // Implementation stays in helpers.cpp.
 bool load_input(
     const onnx::ModelProto& modelproto,

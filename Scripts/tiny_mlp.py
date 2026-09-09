@@ -28,6 +28,10 @@ test_input = torch.tensor(
     dtype=torch.float32
 )
 
+#make a csv file with the test input so tinyinfer can read from it
+with open("Models/model_input.csv", "w", newline="") as file:
+    csv.writer(file).writerow(test_input.flatten().tolist())
+
 with torch.no_grad():
     pytorch_output = model(test_input)
 

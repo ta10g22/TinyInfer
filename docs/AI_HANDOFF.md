@@ -1,5 +1,37 @@
 # AI Handoff
 
+## Large MLP Unoptimized Baseline (2026-09-09)
+- Recorded user-reported unoptimized large_mlp average of 21689.5 microseconds over 10,000 iterations; their correctness check passed.
+- Baseline speedup is 1.0. Updated existing O3 result (4844.56 microseconds) to 4.47708 speedup against this same-model baseline.
+- Read Benchmarks/results.csv and applied the two-row update; no benchmark rerun. Files touched: Benchmarks/results.csv and docs/AI_HANDOFF.md.
+
+## Large MLP Measurement (2026-09-09)
+- Recorded user-reported large_mlp average 4844.56 microseconds, with their PyTorch correctness check passing.
+- Current makefile enables -O3, so recorded in Compiler O3 row. Unoptimized large-model baseline is not measured; speedup left blank.
+- Read CSV and checked CXXFLAGS, then patched Benchmarks/results.csv and this handoff. No benchmark rerun.
+
+## Restored Tiny-Model Measurements (2026-09-09)
+- Restored previously recorded tiny_mlp results after the user noticed blank cells: baseline 13.4596 us / 1.0 speedup; O3 2.62761 us / 5.12237 speedup.
+- These cells were already blank when the missing large_mlp rows were restored earlier; the cause of their removal is unknown.
+- Read Benchmarks/results.csv with sed and restored only the two measurement rows using apply_patch. No benchmarks rerun. Files touched: Benchmarks/results.csv and docs/AI_HANDOFF.md.
+
+## Readiness Recheck (2026-09-09)
+- Confirmed load_weights declaration, false returns on failure, tiny-model input CSV export, and corrected Scripts/large_mlp.py filename.
+- `make TARGET=/tmp/tinyinfer-review-fixed` passed with two signed/unsigned comparison warnings.
+- Both export scripts passed py_compile with PYTHONPYCACHEPREFIX=/tmp/tinyinfer-review-pycache.
+- Large model and input CSV are not generated yet, so large-model inference and numerical correctness remain untested. User can run the large export, make, and ./Tinyinfer from the project root.
+- No implementation changes; only this handoff was updated.
+
+## Large-Model Readiness Review (2026-09-09)
+- Reviewed Source/Tinyinfer.cpp, Source/helpers.cpp, Source/Kernels.cpp, both headers, Scripts/tiny_mlp.py and Scripts/ large_mlp.py without modifying implementation files.
+- `make TARGET=/tmp/tinyinfer-review` fails: load_weights is not declared in helpers.h.
+- load_weights returns 1 on both failure paths; because it returns bool this incorrectly reports success. Change these to false.
+- tiny_mlp.py does not export Models/model_input.csv, so switching back can leave large-model inputs in use. Large script exports matching model/input/reference correctly by inspection.
+- Large script filename has a leading space: Scripts/ large_mlp.py.
+- Both Python scripts passed syntax checking with PYTHONPYCACHEPREFIX=/tmp/tinyinfer-review-pycache .venv/bin/python3.12 -m py_compile. No model exports or inference tests were run.
+- Current main selects large_mlp.onnx. Kernel signatures, transposed-weight indexing, row-wise softmax, and repeated output replacement match these MLPs by inspection. No numerical validation of the large model yet.
+- Only docs/AI_HANDOFF.md changed for this review; user requested findings, not fixes or additional protection.
+
 ## Input Loader Helper (2026-09-09)
 - Added bool load_input(modelproto, Tensor_map) to Source/helpers.cpp and declared it in Headers/helpers.h.
 - Reads Models/model_input.csv into a Tensor using the model's single fixed input shape and name; checks file opening, positive dimensions and value count before inserting.
