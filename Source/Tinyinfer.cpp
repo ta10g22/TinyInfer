@@ -12,36 +12,9 @@
 #include <onnx/onnx_pb.h>
 
 #include "Kernels.h"
+#include "helpers.h"
 using namespace std;
 
-// tensor class
-class Tensor{
-    private:
-    vector<float> tensor_vector;
-    vector<int64_t> tensor_dimension;
-
-    public:
-    //constructor to set tensor fields
-    Tensor(vector<float> tensor_vector, vector<int64_t> tensor_dimension){
-        this-> tensor_vector = tensor_vector;
-        this-> tensor_dimension = tensor_dimension;
-    }
-
-    // there are 2 "const" first one ensure the caller doesn't change the vector while the last one ensure the 
-    //function doesn't change any member variable of the object
-    const vector<float>& get_const_tensor_vector() const{
-        return this->tensor_vector;
-    }
-
-    //another getter function for kernels to modify in place
-    vector<float>& get_tensor_vector(){
-        return this->tensor_vector;
-    }
-
-    const vector<int64_t>& get_tensor_dimension() const{
-        return this->tensor_dimension;
-    }
-};
 
 int main() {
     //store all suported kernels by tinyinfer in a set
@@ -132,57 +105,26 @@ int main() {
         }
     }
     
+    cout << '\n' ;
+
     // add input tensor for model (hardcoded for now)(mayber parsed from a CSV in near future)
     Tensor input_tensor({0.5f, -1.2f, 0.8f, 2.0f}, {1, 4});
     Tensor_map.insert({"input",input_tensor});
 
-    // call kernels from Kernel.h and time output (loop through)
-    auto inference_start = chrono::steady_clock::now();
-
-    for(int i =0; i < modelproto.graph().node_size(); i++){ 
-        if (modelproto.graph().node(i).op_type() == "Gemm") {
-            string input = modelproto.graph().node(i).input(0);
-            string weight = modelproto.graph().node(i).input(1);
-            string bias = modelproto.graph().node(i).input(2);
-            string output = modelproto.graph().node(i).output(0);
-            
-            vector<int64_t> dim = {Tensor_map.at(input).get_tensor_dimension()[0], Tensor_map.at(weight).get_tensor_dimension()[0]};
-            
-            vector<float> output_vector = GEMM(Tensor_map.at(input).get_tensor_vector(), Tensor_map.at(input).get_tensor_dimension(),
-            Tensor_map.at(weight).get_tensor_vector(),Tensor_map.at(weight).get_tensor_dimension(), Tensor_map.at(bias).get_tensor_vector());
-            
-            Tensor_map.insert({output, Tensor(output_vector, dim)}); ;
-        }
-
-        else if (modelproto.graph().node(i).op_type() == "Relu"){
-            string input = modelproto.graph().node(i).input(0);
-            string output = modelproto.graph().node(i).output(0);
-
-            vector<float> output_vector = Tensor_map.at(input).get_const_tensor_vector();
-
-            ReLU(output_vector);
-
-            vector<int64_t> dim = Tensor_map.at(input).get_tensor_dimension();
-
-            Tensor_map.insert({output, Tensor(output_vector, dim)});
-         }
-
-        else if (modelproto.graph().node(i).op_type() == "Softmax"){
-            string input = modelproto.graph().node(i).input(0);
-            string output = modelproto.graph().node(i).output(0);
-
-            vector<float> output_vector = Tensor_map.at(input).get_const_tensor_vector();
-
-            Softmax(output_vector, Tensor_map.at(input).get_tensor_dimension());
-
-            vector<int64_t> dim = Tensor_map.at(input).get_tensor_dimension();
-
-            Tensor_map.insert({output, Tensor(output_vector, dim)});
-        }
+    //warm up (to ensure code and data are already in CPU caches
+    for(int i = 0; i < 100; i++){
+        run_graph(modelproto, Tensor_map);
     }
-    
+
+    // run inference on model 10,000 times 
+    auto inference_start = chrono::steady_clock::now();
+    for(int i = 0; i < 10000 ; i++){
+        run_graph(modelproto, Tensor_map);
+    }
     auto inference_duration = chrono::duration<double, micro>(chrono::steady_clock::now() - inference_start).count() ;
      
+    auto average_time = inference_duration/10000;
+
     // validate correctness
     string final_output_name = modelproto.graph().output(0).name();
     const vector<float> final_output  = Tensor_map.at(final_output_name).get_const_tensor_vector();
@@ -201,21 +143,20 @@ int main() {
 
     while(getline(pytorch_output, value, ',')){
         expected_output.push_back(stof(value));
-    };
+    }
 
     // check if it passed 
     for(int i = 0; i < final_output.size(); i++){
         if (abs(expected_output[i] - final_output[i]) > 0.001f){
             cerr << "Final output doesn't match the expected output, sorry!" << "\n";
+            return 1;
         }
     }
     //passed successfully
     cout << "Final Output and model output match successfully" <<'\n';
 
     //print results
-    cout << "inference time :" <<inference_duration << "microseconds" <<'\n';
-
-    //benchmark performance against maybe ONNX runtime
+    cout << "average inference time :" << average_time << " microseconds" <<'\n';
 
     return 0;
 }

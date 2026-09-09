@@ -1,6 +1,6 @@
 # C++ compiler and language version.
 CXX := g++
-CXXFLAGS := -std=c++20 -Wall -Wextra
+CXXFLAGS := -std=c++20 -O3 -Wall -Wextra
 
 # Location where vcpkg installed ONNX and Protobuf.
 VCPKG_ROOT ?= $(HOME)/vcpkg
@@ -12,13 +12,13 @@ PROTOBUF_CFLAGS := $(shell PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" pkg-config --cfl
 PROTOBUF_LIBS := $(shell PKG_CONFIG_PATH="$(PKG_CONFIG_PATH)" pkg-config --libs protobuf)
 
 # TinyInfer source files and the executable to create.
-SOURCES := Source/Tinyinfer.cpp Source/Kernels.cpp
+SOURCES := Source/Tinyinfer.cpp Source/Kernels.cpp Source/helpers.cpp
 TARGET := Tinyinfer
 
 # Build TinyInfer when make is run without a target.
 all: $(TARGET)
 
-$(TARGET): $(SOURCES) Headers/Kernels.h
+$(TARGET): $(SOURCES) Headers/Kernels.h Headers/helpers.h
 	$(CXX) $(CXXFLAGS) $(PROTOBUF_CFLAGS) -IHeaders \
 		-DONNX_NAMESPACE=onnx -DONNX_ML=1 \
 		$(SOURCES) -L$(VCPKG_PREFIX)/lib \

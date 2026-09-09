@@ -1,0 +1,13 @@
+backend,variant,model,input_shape,threads,iterations,average_us,speedup_vs_baseline
+TinyInfer,Baseline,tiny_mlp,1x4,1,10000,13.4596,1.0
+TinyInfer,Compiler O3,tiny_mlp,1x4,1,10000,2.62761,5.12237
+TinyInfer,Gemm loop ordering,tiny_mlp,1x4,1,10000,,
+TinyInfer,Cache-blocked Gemm,tiny_mlp,1x4,1,10000,,
+TinyInfer,ARM NEON,tiny_mlp,1x4,1,10000,,
+TinyInfer,Multithreading,tiny_mlp,1x4,,10000,,
+TinyInfer,Gemm bias ReLU fusion,tiny_mlp,1x4,1,10000,,
+TinyInfer,Memory reuse,tiny_mlp,1x4,1,10000,,
+TinyInfer,All optimizations,tiny_mlp,1x4,,10000,,
+PyTorch,Single thread,tiny_mlp,1x4,1,10000,,
+PyTorch,Default threads,tiny_mlp,1x4,,10000,,
+ONNX Runtime,Single thread,tiny_mlp,1x4,1,10000,,

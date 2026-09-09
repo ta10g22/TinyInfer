@@ -1,5 +1,23 @@
 # AI Handoff
 
+## Latest O3 Result
+- Recorded the user's latest reported O3 average: 2.62761 microseconds over 10,000 iterations; the user reported the PyTorch comparison passed.
+- Speedup versus the 13.4596-microsecond unoptimized baseline is 5.12237.
+- Files touched: Benchmarks/results.csv and docs/AI_HANDOFF.md. Read the CSV with sed and applied the result patch; no benchmark rerun performed.
+
+## Latest Benchmark Record
+- Recorded the user's reported 10,000-run baseline: 13.4596 microseconds per inference, speedup 1.0, in Benchmarks/results.csv.
+- Current Makefile has no optimization flag. Provided CXXFLAGS with -O3 for the user to apply; did not change the Makefile or run another benchmark.
+- Read the CSV with sed; applied a one-row patch. Next: force rebuild with make -B after changing flags, then run ./Tinyinfer and verify correctness.
+- Files touched: Benchmarks/results.csv and docs/AI_HANDOFF.md.
+
+## Latest Build Update
+- Added Source/helpers.cpp to makefile SOURCES and Headers/helpers.h to target dependencies.
+- Read makefile, Source/helpers.cpp, Headers/helpers.h, and relevant Tinyinfer.cpp calls.
+- Ran `make TARGET=/tmp/tinyinfer-helpers-check`; compilation failed on existing source issues.
+- Next: pass modelproto and Tensor_map to run_graph() in main; qualify vector as std::vector in helpers.h; match the lowercase helpers.h include in helpers.cpp.
+- Files changed for this update: makefile and docs/AI_HANDOFF.md. No source fixes or benchmark changes made.
+
 ## Current State
 TinyInfer has a compilable demo forward pass in `Experiments/forwardpass.cpp`, but its current CSV loading bug makes the third output column incorrect. The tracked `Experiments/Demo_forwardpass.cpp` file is currently deleted in the working tree and appears to have been replaced by the untracked `Experiments/forwardpass.cpp`.
 
