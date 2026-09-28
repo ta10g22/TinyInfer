@@ -1,6 +1,6 @@
 # C++ compiler and language version.
 CXX := g++
-CXXFLAGS := -std=c++20 -Wall -Wextra
+CXXFLAGS := -std=c++20 -O3 -Wall -Wextra
 
 # Location where vcpkg installed ONNX and Protobuf.
 VCPKG_ROOT ?= $(HOME)/vcpkg

@@ -1,5 +1,38 @@
 # AI Handoff
 
+## Simplified Cumulative Benchmark Rows (2026-09-18)
+- User requested one Memory reuse row instead of Reduced tensor copies, Preallocated output buffers, and Tensor lifetime buffer reuse for each model.
+- Removed All optimizations rows: retained improvements accumulate, so the final TinyInfer variant already represents the combined configuration. Precomputed execution plan remains last.
+- Preserved all existing timing and speedup values. Only CSV/checklist documentation changed; no benchmarks rerun.
+
+## Profiling and Remaining Benchmark Work (2026-09-18)
+- Next: profile current optimized execution on both models before further optimization; CSV timings alone do not explain hotspots. Preserve old variants to reproduce and profile earlier experiments.
+- Retained fusion rows; replaced blank Memory reuse rows with Preallocated output buffers. Added Reduced tensor copies, Precomputed execution plan, and Tensor lifetime buffer reuse for both models. Existing measurements preserved.
+- These stages target redundant copies, repeated allocations, per-inference string/map dispatch, and reusing storage after a tensor's last consumer, respectively.
+- User intends sequential optimization. Record exact enabled variants and threads for each run; CSV speedup remains relative to each model's original unoptimized baseline, not the preceding row. Do not assume a multithreaded cumulative variant has one thread.
+- Deferred constant folding and dead-code elimination to dedicated test graphs with constant-only operations and unused branches; the current MLPs do not exercise them. Keep correctness tests and CI on the project checklist, not as timed inference variants.
+- Files touched: Benchmarks/results.csv and docs/AI_HANDOFF.md. Read current CSV/handoff and applied targeted patch; no source changes or benchmarks run.
+
+## Tiny MLP NMK Speedup (2026-09-10)
+- Filled the missing tiny_mlp NMK speedup with 5.18081, calculated as 13.4596 / 2.59797.
+- Read the CSV and patched the single missing cell; no timings changed or benchmarks rerun.
+- Files touched: Benchmarks/results.csv and docs/AI_HANDOFF.md.
+
+## Cache-Blocked Tiny MLP Result (2026-09-10)
+- Recorded user-reported tiny_mlp cache-blocked average 2.3847 us, with their correctness comparison passing.
+- Speedup versus 13.4596-us baseline: 5.64415. Time reduction versus 2.59797-us NMK measurement: approximately 8.2%; repeated measurements needed to distinguish small differences from noise.
+- Read results.csv and patched the tiny-model cache-blocking row. Files touched: Benchmarks/results.csv and docs/AI_HANDOFF.md. No benchmark rerun or kernel changes.
+
+## Cache-Blocked Large MLP Result (2026-09-10)
+- Recorded user-reported cache-blocked large_mlp average: 1125.13 us, with their PyTorch comparison passing.
+- Speedup against the 21689.5-us unoptimized baseline is 19.27733; against the earlier 3788.15-us NMK result it is 3.36686.
+- Read results.csv and patched its large-model cache-blocking row. Files touched: Benchmarks/results.csv and docs/AI_HANDOFF.md. No benchmark rerun or kernel edits.
+
+## Large MLP Loop-Ordering Result (2026-09-09)
+- Recorded user-reported N-M-K Gemm with -O3: 3788.15 us average over 10,000 runs; PyTorch comparison passed according to user output.
+- Speedup versus the unoptimized large-model baseline is 5.72562; versus the original -O3 result it is 1.27887.
+- Read results.csv and patched its loop-ordering row. Files touched: Benchmarks/results.csv and docs/AI_HANDOFF.md. No benchmark rerun or kernel changes.
+
 ## Large MLP Unoptimized Baseline (2026-09-09)
 - Recorded user-reported unoptimized large_mlp average of 21689.5 microseconds over 10,000 iterations; their correctness check passed.
 - Baseline speedup is 1.0. Updated existing O3 result (4844.56 microseconds) to 4.47708 speedup against this same-model baseline.
