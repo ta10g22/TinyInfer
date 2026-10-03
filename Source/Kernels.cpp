@@ -1,6 +1,8 @@
 #include <vector>
 #include <cmath>
 #include <algorithm>
+#include <arm_neon.h>
+
 using namespace std;
 
 
@@ -15,6 +17,7 @@ vector<float> GEMM(vector<float>& input_matrix,const vector<int64_t> &input_dim,
 
     vector<float> output1(batch_size * output_features, 0.0f);
 
+    // outer loops to choose which tiles for each matrix to work on
     for(int64_t NN = 0; NN < batch_size; NN += block_N){
         for(int64_t KK = 0; KK < output_features; KK += block_K){
             for(int64_t MM = 0; MM < input_features; MM += block_M){
@@ -25,11 +28,28 @@ vector<float> GEMM(vector<float>& input_matrix,const vector<int64_t> &input_dim,
                 // Accumulate this block into the output.
                 for(int64_t N = NN; N < end_N; N++){
                     for(int64_t K = KK; K < end_K; K++){
-                        for(int64_t M = MM; M < end_M; M++){
-                            output1[N * output_features + K] +=
-                                input_matrix[N * input_features + M] *
+
+                        //variable sums stores 4 32bit float numbers (init to zero's)
+                        float32x4_t acc = vdupq_n_f32(0.0f);
+                        int64_t M = MM;
+                        for(; M +4 <= end_M; M+=4){
+                             //load 4 32bit floats into both vector registers 
+                            float32x4_t VA  =  vld1q_f32(&input_matrix[N * input_features + M]);
+                            float32x4_t VB  =  vld1q_f32(&weight_matrix[K * input_features + M]);
+
+                            //multiply VA * VB  and ADD to sum
+                            acc = vfmaq_f32(acc, VA, VB);
+                        }
+                        
+                        float32_t sum = vaddvq_f32(acc);
+
+                        //add left over contribution if M isn't aligned
+                        for(;M < end_M; M++){
+                            sum += input_matrix[N * input_features + M] *
                                 weight_matrix[K * input_features + M];
                         }
+
+                        output1[N * output_features + K ] += sum;
                     }
                 }
             }
