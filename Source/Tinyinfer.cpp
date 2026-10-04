@@ -7,12 +7,12 @@
 #include <cstdint>
 #include <cstring>
 #include <chrono>
-#include <cmath>
 
 #include <onnx/onnx_pb.h>
 
 #include "Kernels.h"
 #include "helpers.h"
+#include "benchmark_helpers.h"
 using namespace std;
 
 
@@ -26,7 +26,7 @@ int main() {
     setofkernels.insert("Softmax");
 
     //store the path of the model tinyinfer will use.  <----- LOAD MODEL
-    string model_path = "Models/large_mlp.onnx";
+    string model_path = "Models/tiny_mlp.onnx";
 
     //open ONNX file for reading in binary mode
     ifstream model_file(model_path, ios::binary);
@@ -84,31 +84,14 @@ int main() {
     string final_output_name = modelproto.graph().output(0).name();
     const vector<float> final_output  = Tensor_map.at(final_output_name).get_const_tensor_vector();
 
-    //open csv file of model results
-    ifstream pytorch_output("Models/pytorch_output.csv");
-
-    if (!pytorch_output.is_open()){
-        cerr << "pytorch_output file failed to open" << '\n' ;
+    //load expected results and check correctness
+    vector<float> expected_output;
+    if(!load_csv("Models/pytorch_output.csv", expected_output)){
         return 1;
     }
-    
-    //read each comma separated value
-    vector<float> expected_output;
-    string value;
-
-    while(getline(pytorch_output, value, ',')){
-        expected_output.push_back(stof(value));
+    if(!check_output(final_output.data(), final_output.size(), expected_output)){
+        return 1;
     }
-
-    // check if it passed 
-    for(int i = 0; i < final_output.size(); i++){
-        if (abs(expected_output[i] - final_output[i]) > 0.001f){
-            cerr << "Final output doesn't match the expected output, sorry!" << "\n";
-            return 1;
-        }
-    }
-    //passed successfully
-    cout << "Final Output and model output match successfully" <<'\n';
 
     //print results
     cout << "average inference time :" << average_time << " microseconds" <<'\n';

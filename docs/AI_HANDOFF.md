@@ -1,5 +1,37 @@
 # AI Handoff
 
+## Shared Benchmark Helpers (2026-10-04)
+- Added Headers/benchmark_helpers.h and Source/benchmark_helpers.cpp in the existing beginner-readable style: bool load_csv(path, values) fills a vector using getline/stof; bool check_output(actual, count, expected) checks length, finite values and absolute tolerance 0.001, and reports the result.
+- TinyInfer's load_input delegates CSV reading to load_csv while retaining its own shape/map handling. Both mains use load_csv for references and check_output for comparison. ORT tensor setup and both inference loops are unchanged.
+- Updated both make targets to link the shared source. CSV helper intentionally supports the single-row numeric files produced by the existing scripts, not general quoted/multiline CSV.
+- Built both programs; only the pre-existing ReLU signed/unsigned loop warning remains. TinyInfer ran successfully with its current tiny-model CSVs. ORT passed using a temporary large-model fixture from saved PyTorch weights; project models/CSVs and benchmark results were untouched.
+- Temporary helper tests passed for CRLF CSV parsing, repeated loading without appending, missing file, tolerance match/mismatch, output-count mismatch, NaN and infinity. Existing tracked Tinyinfer executable was preserved by building the verification binary under /tmp.
+
+## Simplified ORT Benchmark (2026-10-04)
+- User requested minimal additions in their original coding style. Removed load_csv helper, stringstream parsing, try/catch, generic type/dimension checks and allocated I/O name lookup from Source/onnx_benchmark.cpp.
+- CSVs are read directly in main with getline/stof like TinyInfer (single-row numeric CSVs from the existing export scripts). Model-derived shape and fixed exported names input/output feed the ORT tensor and Run calls.
+- Retained one CPU thread, 100 warmups, 10,000 timed runs and a separate output check after timing. Only basic file-open, output-count and finite/tolerance checks remain; input must match the selected model. Other session options use defaults.
+- Rebuilt with make onnx_benchmark successfully without warnings. Did not rerun inference in this revision or change the CSVs; user will regenerate matching large-model data. Prior revision's temporary-fixture runtime tests are documented below.
+
+## ONNX Runtime Benchmark (2026-10-04)
+- Implemented Source/onnx_benchmark.cpp at the user's request: numeric CSV loading, model-derived static float32 input shape and I/O names, borrowed input tensor, output comparison (absolute tolerance 0.001 with size and finite-value checks), 100 warmups and 10,000 timed Run calls.
+- Uses CPU execution with one intra-op thread, sequential execution and all graph optimizations. Loading, tensor setup and validation are outside timing; timed calls include returned output allocation/destruction.
+- Added separate `make onnx_benchmark` target linked against native Homebrew ORT under /opt/homebrew/opt/onnxruntime (ORT_PREFIX can override). Run `./onnx_benchmark` from the project root.
+- Builds without warnings. Passed inference against a temporary PyTorch fixture using the saved large-model weights; rejected a NaN reference, wrong output count and the currently mismatched input CSV. Temporary fixtures were removed; project CSVs and model files were not changed.
+- Default benchmark model is Models/large_mlp.onnx. User plans to regenerate matching CSVs; current project CSVs contain the tiny-model inputs. No official timing added to results.csv.
+
+## Tiny MLP NEON Result (2026-10-03)
+- Confirmed Source/Tinyinfer.cpp selects Models/tiny_mlp.onnx and averages 10,000 iterations.
+- Recorded user-reported tiny_mlp ARM NEON average 2.49099 us with reported correctness pass; speedup versus 13.4596-us baseline is 5.40331.
+- This measurement is approximately 4.46% slower than the earlier 2.3847-us cache-blocked result; repeat measurements before concluding a regression.
+- Preserved other CSV results. No source changes or independent benchmark rerun.
+
+## Large MLP NEON Result (2026-10-03)
+- Confirmed Source/Tinyinfer.cpp selects Models/large_mlp.onnx and averages 10,000 run_graph calls.
+- Recorded user-reported ARM NEON average 624.824 us; user's output reports the correctness check passed. No independent benchmark or validation rerun.
+- Speedup versus original large-model baseline 21689.5 us: 34.71298. Versus previous cache-blocked result 1125.13 us: approximately 1.80072.
+- Updated only the large_mlp ARM NEON measurement in Benchmarks/results.csv; previous measurements preserved. No source edits.
+
 ## Simplified Cumulative Benchmark Rows (2026-09-18)
 - User requested one Memory reuse row instead of Reduced tensor copies, Preallocated output buffers, and Tensor lifetime buffer reuse for each model.
 - Removed All optimizations rows: retained improvements accumulate, so the final TinyInfer variant already represents the combined configuration. Precomputed execution plan remains last.

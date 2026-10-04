@@ -2,12 +2,12 @@
 #include <vector>
 #include <unordered_map>
 #include <cstdint>
-#include <fstream>
 #include <iostream>
 
 #include <onnx/onnx_pb.h>
 
 #include "helpers.h"
+#include "benchmark_helpers.h"
 #include "Kernels.h"
 
 using namespace std;
@@ -57,10 +57,8 @@ bool load_weights(const onnx::ModelProto& modelproto, unordered_map<string, Tens
 
 
 bool load_input(const onnx::ModelProto& modelproto, unordered_map<string, Tensor>& Tensor_map){
-    ifstream input_file("Models/model_input.csv");
-
-    if(!input_file.is_open()){
-        cerr << "Model input file failed to open\n";
+    vector<float> input_values;
+    if(!load_csv("Models/model_input.csv", input_values)){
         return false;
     }
 
@@ -71,13 +69,7 @@ bool load_input(const onnx::ModelProto& modelproto, unordered_map<string, Tensor
         );
     }
 
-    Tensor input_tensor({}, input_dim);
-    string value;
-
-    while(getline(input_file, value, ',')){
-        input_tensor.get_tensor_vector().push_back(stof(value));
-    }
-
+    Tensor input_tensor(input_values, input_dim);
     Tensor_map.insert({modelproto.graph().input(0).name(), input_tensor});
     return true;
 }
