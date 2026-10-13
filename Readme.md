@@ -34,7 +34,7 @@ The purpose of TinyInfer is to build the layer underneath a machine learning fra
 Instead of only using:
 
 ```python
-model(input)
+torch.compile()
 ```
 
 this project explores what that call actually requires internally.
@@ -70,8 +70,6 @@ TinyInfer is designed around three engineering goals:
 * [ ] Unit tests for core operations
 
 ### Version 2: Performance kernels
-
-A kernel is a performance-critical function that implements one operation, such as matrix multiplication.
 
 * [ ] Naive matrix multiplication
 * [ ] Cache-blocked matrix multiplication
