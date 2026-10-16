@@ -1,5 +1,34 @@
 # AI Handoff
 
+## Multithreading Deferred (2026-10-14)
+- At the user's request, moved each TinyInfer Multithreading row directly after Precomputed execution plan in Benchmarks/results.csv, for both tiny_mlp and large_mlp.
+- All existing row values and measurements are unchanged. Single-thread optimization stages come first; multithreading is deferred to the end. No source edits or benchmark runs.
+
+## PyTorch Compiled Results (2026-10-05)
+- User successfully ran the benchmark in the new .venv-benchmark environment with PyTorch 2.14.1; this resolves the older environment's compilation blocker for these runs. Both models reported correctness passes, one CPU thread and 10,000 timed calls after compilation/100 warmups.
+- Recorded user-reported tiny_mlp average 14.92176 us (speedup vs original TinyInfer baseline 13.4596 / 14.92176 = 0.90201) and large_mlp average 52.30971 us (21689.5 / 52.30971 = 414.63621).
+- Relabeled PyTorch rows explicitly as Compiled Python API single/default thread variants. Default-thread measurements remain blank. Preserved all non-PyTorch measurements; no independent timing rerun.
+- Large compiled PyTorch result is approximately 2.27 times faster than recorded ORT large-model latency. Cause is not established; do not attribute it specifically to fusion or assume compiled PyTorch always wins. API overhead differs between the Python and C++ benchmarks.
+- User generated matching large-model files using the original .venv before switching back to .venv-benchmark. Missing NumPy warnings did not prevent these runs. Neither environment was modified in this recording step.
+
+## PyTorch Compiled Benchmark Script (2026-10-05)
+- Implemented the user's existing Scripts/Pytorch_benchmark.py (capital P retained). `--model tiny|large` selects matching dimensions and saved .pt weights; shared CSVs must match the selection. `--threads` defaults to 1; 0 preserves PyTorch's default (12 in the current environment).
+- Uses a single parameterized MLP class with the same net.* state-dict keys as the export scripts; never imports those scripts or overwrites models/CSVs. Uses eval(), inference_mode(), CPU float32, torch.compile(backend="inductor", fullgraph=True), finite/tolerance correctness checks, 100 warmups and 10,000 perf_counter-timed calls. Prints compiled/Python-API label, version and actual thread count. Compilation and loading are outside timing.
+- Compiled benchmark is currently BLOCKED by installed PyTorch 2.2.2 on Python 3.12: torch.compile raises "Dynamo is not supported on Python 3.12+" before graph compilation. Confirmed the explicit guard in the installed torch/__init__.py. No environment upgrades or eager fallback were made; no timings recorded.
+- Verified imports, loading saved weights and CPU forward shapes for both models, tiny-model CSV correctness using an uncompiled validation call, and clear rejection when large is selected with tiny CSVs. End-to-end compiled execution still requires a compatible environment (e.g. separate Python 3.11 environment for this PyTorch version, or a compatible newer PyTorch/Python pair); native compiler support must then be tested too.
+- After resolving the environment: `python Scripts/Pytorch_benchmark.py --model tiny` or `--model large`, optionally `--threads 0`. Existing PyTorch CSV labels still do not distinguish compiled execution; relabel explicitly when recording actual measurements.
+
+## Tiny MLP ONNX Runtime Result (2026-10-04)
+- Confirmed Source/onnx_benchmark.cpp selects Models/tiny_mlp.onnx, one intra-op thread and 10,000 timed runs.
+- Recorded user-reported correctness pass and average 1.74834 us in the ONNX Runtime single-thread tiny_mlp row. Speedup versus the 13.4596-us TinyInfer baseline is 7.69850.
+- Approximately 1.42 times faster than the recorded TinyInfer NEON result (2.49099 us). Preserved the large-model ORT result and all other measurements. No independent timing rerun or source changes.
+
+## Large MLP ONNX Runtime Result (2026-10-04)
+- Confirmed Source/onnx_benchmark.cpp selects Models/large_mlp.onnx with one intra-op CPU thread, 100 warmups and 10,000 timed runs.
+- Recorded user-reported correctness pass and average 118.977 us per full 32x256 input batch in Benchmarks/results.csv. No independent benchmark rerun for this entry.
+- Speedup versus the original TinyInfer large-model baseline is 21689.5 / 118.977 = 182.29994. Compared with the recorded NEON result (624.824 us), ORT is approximately 5.25 times faster on these reported measurements.
+- Preserved every other benchmark entry and all source/model/CSV input files.
+
 ## Shared Benchmark Helpers (2026-10-04)
 - Added Headers/benchmark_helpers.h and Source/benchmark_helpers.cpp in the existing beginner-readable style: bool load_csv(path, values) fills a vector using getline/stof; bool check_output(actual, count, expected) checks length, finite values and absolute tolerance 0.001, and reports the result.
 - TinyInfer's load_input delegates CSV reading to load_csv while retaining its own shape/map handling. Both mains use load_csv for references and check_output for comparison. ORT tensor setup and both inference loops are unchanged.

@@ -11,7 +11,7 @@ using namespace std;
 
 int main(){
     //onnx model location
-    string modelpath = "Models/large_mlp.onnx";
+    string modelpath = "Models/tiny_mlp.onnx";
 
     // Runtime Env
     Ort::Env env;
