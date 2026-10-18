@@ -1,5 +1,32 @@
 # AI Handoff
 
+## PyTorch Default-Thread Rows Removed (2026-10-18)
+- At the user's request, removed both unmeasured PyTorch Compiled Python API default threads rows from Benchmarks/results.csv. Comparisons now focus on the configured single-thread runs alongside single-thread TinyInfer.
+- Preserved all recorded measurements and the threads column. The Python script's optional thread setting remains unchanged; no source edits or benchmark runs.
+
+## Multithreading Removed From Benchmark Plan (2026-10-18)
+- At the user's request, removed the unmeasured TinyInfer Multithreading rows for tiny_mlp and large_mlp from Benchmarks/results.csv. This supersedes the earlier decision to defer those rows until after execution planning.
+- Focus remains on kernel and runtime optimizations without adding CPU thread scaling. Retained the threads column, other backend rows, and all measurements. No implementation or README changes.
+
+## Large Softmax Fusion Repeated Results (2026-10-18)
+- User screenshot reports five correctness passes and average inference times in us: 591.965, 583.607, 582.997, 614.478, 587.655.
+- At the user's request, recorded the arithmetic mean of these five run averages: 592.1404 us. Each run averages 10,000 iterations. Range: 582.997-614.478 us. This differs from the median aggregation used for the tiny-model row.
+- Updated the existing large Softmax-fusion entry from 584.377 us, corrected its label, and calculated speedup versus original baseline: 21689.5 / 592.1404 = 36.62898.
+- Preserved all other rows, including the user's latest tiny-model label. No new benchmark execution or source edits. This is the cumulative fusion stage retaining GEMM-ReLU fusion and the operation-record plan.
+
+## Tiny Softmax Fusion Repeated Results (2026-10-18)
+- User screenshot shows nine successful tiny-model runs, with average inference times in us: 0.758725, 0.837408, 0.933033, 0.893675, 0.910238, 0.906346, 0.910729, 0.946917, 0.885667.
+- Updated the existing tiny Softmax-fusion row from the preliminary 0.97 us to 0.906346 us, the median of these nine run averages. Each run averages 10,000 iterations; this is not a median of individual inference latencies. Range: 0.758725-0.946917 us.
+- Speedup versus original tiny baseline: 13.4596 / 0.906346 = 14.85040. Corrected the row's Softmax spelling and labeled the aggregation explicitly. This cumulative stage also retains GEMM-ReLU fusion and the operation-record executor.
+- All other benchmark rows, including the user's large Softmax-fusion entry, are unchanged. No new benchmark run or source edit for this recording step.
+
+## Fusion Results (2026-10-18)
+- Recorded user-reported correctness passes and averages: tiny_mlp 1.26411 us and large_mlp 601.372 us, one thread, 100 warmups and 10,000 timed iterations. No independent timing or correctness rerun.
+- Speedups versus original TinyInfer baselines are 10.64749 and 36.06669 respectively. Existing measurements are unchanged.
+- Labeled the fusion rows as Gemm bias ReLU fusion + operation-record plan: these measurements include both the fused kernel and the new vector-based executor. They do not isolate fusion alone. The separate Precomputed execution plan rows remain unmeasured; do not treat this run as an independent measurement for those rows.
+- Current source selects Models/large_mlp.onnx and has no OpenMP references in Kernels.cpp. The user regenerated matching CSVs for each model before successful runs.
+- GEMM dominance in the new large-model run is an inference from workload and earlier profiling, not established by a fresh profile. Repeat timings and profile before attributing the remaining cost precisely.
+
 ## Multithreading Deferred (2026-10-14)
 - At the user's request, moved each TinyInfer Multithreading row directly after Precomputed execution plan in Benchmarks/results.csv, for both tiny_mlp and large_mlp.
 - All existing row values and measurements are unchanged. Single-thread optimization stages come first; multithreading is deferred to the end. No source edits or benchmark runs.

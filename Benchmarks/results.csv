@@ -4,22 +4,20 @@ TinyInfer,Compiler O3,tiny_mlp,1x4,1,10000,2.62761,5.12237
 TinyInfer,Gemm loop ordering (NMK),tiny_mlp,1x4,1,10000,2.59797,5.18081
 TinyInfer,Cache-blocked Gemm,tiny_mlp,1x4,1,10000,2.3847,5.64415
 TinyInfer,ARM NEON,tiny_mlp,1x4,1,10000,2.49099,5.40331
-TinyInfer,Gemm bias ReLU fusion,tiny_mlp,1x4,1,10000,,
+TinyInfer,Gemm bias ReLU fusion + operation-record plan,tiny_mlp,1x4,1,10000,1.26411,10.64749
+TinyInfer,Gemm bias Softmax fusion,tiny_mlp,1x4,1,10000,0.906346,14.85040
 TinyInfer,Memory reuse,tiny_mlp,1x4,1,10000,,
 TinyInfer,Precomputed execution plan,tiny_mlp,1x4,1,10000,,
-TinyInfer,Multithreading,tiny_mlp,1x4,,10000,,
-PyTorch,Compiled Python API single thread,tiny_mlp,1x4,1,10000,14.92176,0.90201
-PyTorch,Compiled Python API default threads,tiny_mlp,1x4,,10000,,
+Torchinductor,Compiled Python API single thread,tiny_mlp,1x4,1,10000,14.92176,0.90201
 ONNX Runtime,Single thread,tiny_mlp,1x4,1,10000,1.74834,7.69850
 TinyInfer,Baseline,large_mlp,32x256,1,10000,21689.5,1.0
 TinyInfer,Compiler O3,large_mlp,32x256,1,10000,4844.56,4.47708
 TinyInfer,Gemm loop ordering (NMK),large_mlp,32x256,1,10000,3788.15,5.72562
 TinyInfer,Cache-blocked Gemm,large_mlp,32x256,1,10000,1125.13,19.27733
 TinyInfer,ARM NEON,large_mlp,32x256,1,10000,624.824,34.71298
-TinyInfer,Gemm bias ReLU fusion,large_mlp,32x256,1,10000,,
+TinyInfer,Gemm bias ReLU fusion + operation-record plan,large_mlp,32x256,1,10000,601.372,36.06669
+TinyInfer,Gemm bias Softmax fusion,large_mlp,32x256,1,10000,592.1404,36.62898
 TinyInfer,Memory reuse,large_mlp,32x256,1,10000,,
-TinyInfer,Precomputed execution plan,large_mlp,32x256,1,10000,,""
-TinyInfer,Multithreading,large_mlp,32x256,,10000,,
-PyTorch,Compiled Python API single thread,large_mlp,32x256,1,10000,52.30971,414.63621
-PyTorch,Compiled Python API default threads,large_mlp,32x256,,10000,,
+TinyInfer,Precomputed execution plan,large_mlp,32x256,1,10000,,
+Torchinductor,Compiled Python API single thread,large_mlp,32x256,1,10000,52.30971,414.63621
 ONNX Runtime,Single thread,large_mlp,32x256,1,10000,118.977,182.29994

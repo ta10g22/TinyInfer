@@ -2,7 +2,9 @@
 #include <vector>
 #include <unordered_map>
 #include <cstdint>
+#include <stdexcept>
 #include <iostream>
+#include <cstring>
 
 #include <onnx/onnx_pb.h>
 
@@ -74,49 +76,163 @@ bool load_input(const onnx::ModelProto& modelproto, unordered_map<string, Tensor
     return true;
 }
 
-void run_graph(const onnx::ModelProto& modelproto,  unordered_map<string, Tensor>& Tensor_map ){
-    for(int i =0; i < modelproto.graph().node_size(); i++){ 
-        if (modelproto.graph().node(i).op_type() == "Gemm") {
-            string input = modelproto.graph().node(i).input(0);
-            string weight = modelproto.graph().node(i).input(1);
-            string bias = modelproto.graph().node(i).input(2);
-            string output = modelproto.graph().node(i).output(0);
-            
-            vector<int64_t> dim = {Tensor_map.at(input).get_tensor_dimension()[0], Tensor_map.at(weight).get_tensor_dimension()[0]};
-            
-            vector<float> output_vector = GEMM(Tensor_map.at(input).get_tensor_vector(), Tensor_map.at(input).get_tensor_dimension(),
-            Tensor_map.at(weight).get_tensor_vector(),Tensor_map.at(weight).get_tensor_dimension(), Tensor_map.at(bias).get_tensor_vector());
-            
-            Tensor_map.erase(output);
-            Tensor_map.insert({output, Tensor(output_vector, dim)}); ;
+
+vector<onnx_node> onnx_optimize(const onnx::ModelProto& modelproto){
+    vector<onnx_node> optimized_graph;
+    unordered_map<string, int> consumers;
+    unordered_set<string> graph_outputs;
+
+    // Count every use of each tensor across the graph.
+    for(const auto& node : modelproto.graph().node()){
+        for(const auto& input : node.input()){
+            if(!input.empty()){
+                consumers[input]++;
+            }
+        }
+    }
+
+    // Preserve tensors requested as model outputs.
+    for(const auto& output : modelproto.graph().output()){
+        graph_outputs.insert(output.name());
+    }
+
+    for(int i = 0; i < modelproto.graph().node_size(); i++){
+        const auto& node = modelproto.graph().node(i);
+
+        onnx_node operation;
+        operation.op_type = node.op_type();
+        operation.domain = node.domain();
+
+        for(const auto& input : node.input()){
+            operation.input_names.push_back(input);
+        }
+        for(const auto& output : node.output()){
+            operation.output_names.push_back(output);
+        }
+        for(const auto& attribute : node.attribute()){
+            operation.attributes.push_back(attribute);
         }
 
-        else if (modelproto.graph().node(i).op_type() == "Relu"){
-            string input = modelproto.graph().node(i).input(0);
-            string output = modelproto.graph().node(i).output(0);
+        if(node.domain().empty() && node.op_type() == "Gemm" &&
+           node.output_size() == 1 &&
+           i + 1 < modelproto.graph().node_size()){
+            const auto& next = modelproto.graph().node(i + 1);
+            const string& output = node.output(0);
 
-            vector<float> output_vector = Tensor_map.at(input).get_const_tensor_vector();
+            if(next.domain().empty() &&
+               next.input_size() == 1 && next.output_size() == 1 &&
+               !output.empty() && next.input(0) == output &&
+               consumers[output] == 1 &&
+               graph_outputs.count(output) == 0){
 
-            ReLU(output_vector);
+                bool fuse_relu = next.op_type() == "Relu";
+                bool fuse_softmax = false;
 
-            vector<int64_t> dim = Tensor_map.at(input).get_tensor_dimension();
+                // Only fuse explicitly row-wise Softmax on our 2D output.
+                if(next.op_type() == "Softmax"){
+                    for(const auto& attribute : next.attribute()){
+                        if(attribute.name() == "axis" &&
+                           attribute.type() == onnx::AttributeProto::INT &&
+                           (attribute.i() == 1 || attribute.i() == -1)){
+                            fuse_softmax = true;
+                        }
+                    }
+                }
+
+                if(fuse_relu || fuse_softmax){
+                    if(fuse_relu){
+                        operation.op_type = "Fused_GEMM_ReLU";
+                    }
+                    else{
+                        operation.op_type = "Fused_GEMM_Softmax";
+                        for(const auto& attribute : next.attribute()){
+                            operation.attributes.push_back(attribute);
+                        }
+                    }
+
+                    operation.output_names.clear();
+                    operation.output_names.push_back(next.output(0));
+                    i++;
+                }
+            }
+        }
+
+        optimized_graph.push_back(operation);
+    }
+
+    return optimized_graph;
+}
+
+
+void run_graph(const vector<onnx_node>& optimized_graph,
+               unordered_map<string, Tensor>& Tensor_map){
+    for(const auto& node : optimized_graph){
+        string input = node.input_names.at(0);
+        string output = node.output_names.at(0);
+
+        if(node.op_type == "Gemm" || node.op_type == "Fused_GEMM_ReLU" || node.op_type == "Fused_GEMM_Softmax" ){
+            string weight = node.input_names.at(1);
+            string bias = node.input_names.at(2);
+
+            Tensor& input_tensor = Tensor_map.at(input);
+            Tensor& weight_tensor = Tensor_map.at(weight);
+            Tensor& bias_tensor = Tensor_map.at(bias);
+
+            vector<int64_t> dim = {
+                input_tensor.get_tensor_dimension()[0],
+                weight_tensor.get_tensor_dimension()[0]
+            };
+
+            vector<float> output_vector;
+
+            if(node.op_type == "Fused_GEMM_ReLU"){
+                output_vector = Fused_GEMM_ReLU(
+                    input_tensor.get_tensor_vector(),
+                    input_tensor.get_tensor_dimension(),
+                    weight_tensor.get_tensor_vector(),
+                    weight_tensor.get_tensor_dimension(),
+                    bias_tensor.get_tensor_vector());
+            }
+
+            else if(node.op_type == "Fused_GEMM_Softmax"){
+                output_vector = Fused_GEMM_Softmax(
+                    input_tensor.get_tensor_vector(),
+                    input_tensor.get_tensor_dimension(),
+                    weight_tensor.get_tensor_vector(),
+                    weight_tensor.get_tensor_dimension(),
+                    bias_tensor.get_tensor_vector());
+            }
+
+            else{
+                output_vector = GEMM(
+                    input_tensor.get_tensor_vector(),
+                    input_tensor.get_tensor_dimension(),
+                    weight_tensor.get_tensor_vector(),
+                    weight_tensor.get_tensor_dimension(),
+                    bias_tensor.get_tensor_vector());
+            }
 
             Tensor_map.erase(output);
             Tensor_map.insert({output, Tensor(output_vector, dim)});
-         }
+        }
+        else if(node.op_type == "Relu" || node.op_type == "Softmax"){
+            vector<float> output_vector =
+                Tensor_map.at(input).get_const_tensor_vector();
+            vector<int64_t> dim =
+                Tensor_map.at(input).get_tensor_dimension();
 
-        else if (modelproto.graph().node(i).op_type() == "Softmax"){
-            string input = modelproto.graph().node(i).input(0);
-            string output = modelproto.graph().node(i).output(0);
-
-            vector<float> output_vector = Tensor_map.at(input).get_const_tensor_vector();
-
-            Softmax(output_vector, Tensor_map.at(input).get_tensor_dimension());
-
-            vector<int64_t> dim = Tensor_map.at(input).get_tensor_dimension();
+            if(node.op_type == "Relu"){
+                ReLU(output_vector);
+            }
+            else{
+                Softmax(output_vector, dim);
+            }
 
             Tensor_map.erase(output);
             Tensor_map.insert({output, Tensor(output_vector, dim)});
+        }
+        else{
+            throw runtime_error("Unsupported operation: " + node.op_type);
         }
     }
 }

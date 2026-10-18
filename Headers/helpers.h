@@ -37,6 +37,21 @@ class Tensor{
     }
 };
 
+
+class onnx_node {
+public:
+    string op_type;
+    string domain;
+
+    vector<string> input_names;
+    vector<string> output_names;
+
+    vector<onnx::AttributeProto> attributes;
+};
+
+vector<onnx_node> onnx_optimize(
+    const onnx::ModelProto& modelproto);
+
 bool load_weights(
     const onnx::ModelProto& modelproto,
     unordered_map<string, Tensor>& Tensor_map
@@ -48,7 +63,8 @@ bool load_input(
     std::unordered_map<std::string, Tensor>& Tensor_map
 );
 
-void run_graph(
-    const onnx::ModelProto& modelproto,
-    std::unordered_map<std::string, Tensor>& Tensor_map
+
+void run_graph(const vector<onnx_node>& optimized_graph,
+               unordered_map<string, Tensor>& Tensor_map
 );
+
