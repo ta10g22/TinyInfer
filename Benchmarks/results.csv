@@ -8,8 +8,8 @@ TinyInfer,Gemm bias ReLU fusion + operation-record plan,tiny_mlp,1x4,1,10000,1.2
 TinyInfer,Gemm bias Softmax fusion,tiny_mlp,1x4,1,10000,0.906346,14.85040
 TinyInfer,Multiple SIMD accumulators,tiny_mlp,1x4,1,10000,0.928921,14.48950
 TinyInfer,Register blocking,tiny_mlp,1x4,1,10000,0.883733,15.23039
-TinyInfer,Memory reuse,tiny_mlp,1x4,1,10000,,
-TinyInfer,Precomputed execution plan,tiny_mlp,1x4,1,10000,,
+TinyInfer,Accumulator retention across MM tiles,tiny_mlp,1x4,1,10000,0.9457875,14.23110
+TinyInfer,Tensor buffer reuse,tiny_mlp,1x4,1,10000,,
 Torchinductor,Compiled Python API single thread,tiny_mlp,1x4,1,10000,14.92176,0.90201
 ONNX Runtime,Single thread,tiny_mlp,1x4,1,10000,1.74834,7.69850
 TinyInfer,Baseline,large_mlp,32x256,1,10000,21689.5,1.0
@@ -21,7 +21,7 @@ TinyInfer,Gemm bias ReLU fusion + operation-record plan,large_mlp,32x256,1,10000
 TinyInfer,Gemm bias Softmax fusion,large_mlp,32x256,1,10000,592.1404,36.62898
 TinyInfer,Multiple SIMD accumulators,large_mlp,32x256,1,10000,433.081,50.08186
 TinyInfer,Register blocking,large_mlp,32x256,1,10000,313.202,69.25083
-TinyInfer,Memory reuse,large_mlp,32x256,1,10000,,
-TinyInfer,Precomputed execution plan,large_mlp,32x256,1,10000,,
+TinyInfer,Accumulator retention across MM tiles,large_mlp,32x256,1,10000,257.434,84.25266
+TinyInfer,Tensor buffer reuse,large_mlp,32x256,1,10000,,
 Torchinductor,Compiled Python API single thread,large_mlp,32x256,1,10000,52.30971,414.63621
 ONNX Runtime,Single thread,large_mlp,32x256,1,10000,118.977,182.29994

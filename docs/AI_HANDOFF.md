@@ -1,5 +1,22 @@
 # AI Handoff
 
+## Benchmark Placeholder Cleanup (2026-10-19)
+- At the user's request, renamed Memory reuse to Tensor buffer reuse for both models and removed both unmeasured Precomputed execution plan rows. Preserved all recorded measurements and existing fusion labels. These are table-only changes; tensor buffer reuse remains unimplemented.
+
+## Tiny Accumulator-Retention Result Recorded (2026-10-19)
+- Recorded the median of six user-reported tiny_mlp run averages: 1.32367, 1.00265, 0.964504, 0.917983, 0.927071, 0.864812 us. All displayed correctness checks passed, and the selected source model is tiny_mlp. Median: 0.9457875 us; speedup versus the original 13.4596 us baseline: 14.23110.
+- Filled only the tiny Accumulator retention across MM tiles measurement. No new benchmark runs or implementation changes.
+
+## Large Accumulator-Retention Result Recorded (2026-10-19)
+- Added Accumulator retention across MM tiles rows after Register blocking, preserving previous results. Large records one user-reported 10,000-iteration average of 257.434 us with correctness passing; the selected source model is large_mlp. Speedup versus original 21689.5 us baseline: 84.25266. Tiny remains unmeasured for this stage.
+- This run's average is 17.8 percent lower than the previous 313.202 us register-blocking measurement. No new benchmark runs or kernel edits were made while recording this result.
+
+## Accumulator Retention Across MM Tiles (2026-10-19)
+- Reviewed the user's updated GEMM: NN/KK/N/K/MM ordering, accumulators and scalar tails initialized before MM, reductions and assignment after all MM tiles, and SIMD odd-column fallback are correct for the supported matrix layout. Left GEMM and standalone activations unchanged.
+- Applied the same loop structure to Fused_GEMM_ReLU and Fused_GEMM_Softmax. Preserved two-output/eight-accumulator computation, comments, tile sizes, and bias/activation placement. Softmax still waits until all columns of the current batch-row tile are complete. This changes traversal/cache reuse; performance improvement is not assumed.
+- Extended temporary /private/tmp/tinyinfer-review.bOcBwc/review.cpp to 21 shapes, including exact tiny layer shapes and both large layers. Direct double-reference GEMM checks, fused/unfused comparisons, Softmax reference/row sums, both model execution plans, repeated inference, and fusion guards passed under AddressSanitizer/UndefinedBehaviorSanitizer and -O3.
+- Existing standalone Softmax axis=0 limitation and ReLU signed/unsigned warning remain unchanged. No benchmark values, fixtures, or project executables changed. Rebuild with make before benchmarking.
+
 ## Tiny Register-Blocking Result Recorded (2026-10-18)
 - Recorded the median of seven user-reported tiny_mlp runs: 0.684763, 0.940183, 0.8681, 0.901858, 0.986313, 0.883733, 0.826179 us per inference. Each is a 10,000-iteration average; all displayed correctness checks passed. Median: 0.883733 us; speedup versus the original 13.4596 us baseline: 15.23039. Used the median consistently with prior repeated tiny-model measurements.
 - Updated only the tiny Register blocking measurement. No implementation changes or new benchmark runs.
