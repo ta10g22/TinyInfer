@@ -1,5 +1,21 @@
 # AI Handoff
 
+## Four-Accumulator Results Recorded (2026-10-18)
+- Filled the user's renamed Feature Reduction w Arm Neon rows in Benchmarks/results.csv. Tiny uses the median of five user-reported 10,000-inference averages: 1.3327, 0.812229, 0.871121, 0.933787, 0.928921 us. Median: 0.928921 us; speedup versus original tiny baseline: 14.48950.
+- Large uses the single user-reported result after rebuilding: 433.081 us; speedup versus original large baseline: 50.08186. The earlier 585.107 us was measured before rebuilding and is not used for this optimization.
+- User outputs report correctness checks passing. Preserved existing labels and other results; no implementation changes or new benchmark runs. Tiny reduction lengths 4 and 5 do not enter the 16-feature loop.
+
+## Four Accumulators Applied to Fused Kernels (2026-10-18)
+- User updated Fused_GEMM_ReLU correctly. At the user's request, updated only Fused_GEMM_Softmax in Source/Kernels.cpp to use four accumulators with 16-feature chunks, four-wide tails, balanced vector combination, and scalar leftovers. Retained the partial-output += update, tile order, bias addition, and row-wise Softmax placement. Plain GEMM and both fused kernels now use this strategy.
+- Extended the temporary /private/tmp review harness to 13 shapes including feature counts 15/16/17/20/31 and partial N/K/M tiles. Both fused kernels matched separate execution, Softmax matched an independent double reference within tolerance, and row normalization checks passed. Both exported model plans and repeated execution matched unfused execution. AddressSanitizer/UndefinedBehaviorSanitizer reported no issues; only the pre-existing ReLU signed/unsigned warning remains.
+- Existing unsupported Softmax axis=0 fallback issue remains unchanged. No official timing was recorded, no model/CSV files were regenerated, and Four-accumulator NEON benchmark rows remain blank. Rebuild the user's executable with make before benchmarking. Register retention across MM tiles is not implemented.
+
+## Four-Accumulator NEON Review (2026-10-18)
+- Added unmeasured Four-accumulator NEON rows after Softmax fusion for both models, before Memory reuse. All existing measurements and user labels remain unchanged.
+- User updated only plain GEMM with four accumulators, 16-feature chunks, four-wide and scalar tails, and balanced accumulator combination. Both fused kernels still use one accumulator, so the currently optimized MLP execution does not exercise the new plain GEMM path. Apply the equivalent change to both fused kernels before timing this stage.
+- Rebuilt the temporary review harness with AddressSanitizer/UndefinedBehaviorSanitizer. Seven kernel-shape comparisons (separate GEMM/Softmax versus fused Softmax and double-reference comparisons), both model plans/repeated inference, and consumer/output guards passed with no sanitizer reports. Existing axis=0 fallback limitation remains reproducible. Only the existing ReLU signed/unsigned warning was emitted.
+- No implementation changes or benchmark timing recorded. Tiny MLP reduction lengths are 4 and 5, so its kernels will not enter the new 16-feature loop even once the fused kernels are updated. This optimization does not yet retain output accumulators across MM tiles.
+
 ## PyTorch Default-Thread Rows Removed (2026-10-18)
 - At the user's request, removed both unmeasured PyTorch Compiled Python API default threads rows from Benchmarks/results.csv. Comparisons now focus on the configured single-thread runs alongside single-thread TinyInfer.
 - Preserved all recorded measurements and the threads column. The Python script's optional thread setting remains unchanged; no source edits or benchmark runs.

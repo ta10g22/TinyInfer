@@ -33,23 +33,48 @@ vector<float> GEMM(vector<float>& input_matrix,const vector<int64_t> &input_dim,
                     for(int64_t K = KK; K < end_K; K++){
 
                         //variable sums stores 4 32bit float numbers (init to zero's)
-                        float32x4_t acc = vdupq_n_f32(0.0f);
-                        int64_t M = MM;
-                        for(; M +4 <= end_M; M+=4){
-                             //load 4 32bit floats into both vector registers 
-                            float32x4_t VA  =  vld1q_f32(&input_matrix[N * input_features + M]);
-                            float32x4_t VB  =  vld1q_f32(&weight_matrix[K * input_features + M]);
+                        float32x4_t acc0 = vdupq_n_f32(0.0f);
+                        float32x4_t acc1 = vdupq_n_f32(0.0f);
+                        float32x4_t acc2 = vdupq_n_f32(0.0f);
+                        float32x4_t acc3 = vdupq_n_f32(0.0f);
 
-                            //multiply VA * VB  and ADD to sum
-                            acc = vfmaq_f32(acc, VA, VB);
+
+                        int64_t M = MM;
+                        for(; M + 16 <= end_M; M += 16){
+                            float32x4_t VA = vld1q_f32(&input_matrix[N * input_features + M]);
+                            float32x4_t VB = vld1q_f32(&weight_matrix[K * input_features + M]);
+                            acc0 = vfmaq_f32(acc0, VA, VB);
+
+                            VA = vld1q_f32(&input_matrix[N * input_features + M + 4]);
+                            VB = vld1q_f32(&weight_matrix[K * input_features + M + 4]);
+                            acc1 = vfmaq_f32(acc1, VA, VB);
+
+                            VA = vld1q_f32(&input_matrix[N * input_features + M + 8]);
+                            VB = vld1q_f32(&weight_matrix[K * input_features + M + 8]);
+                            acc2 = vfmaq_f32(acc2, VA, VB);
+
+                            VA = vld1q_f32(&input_matrix[N * input_features + M + 12]);
+                            VB = vld1q_f32(&weight_matrix[K * input_features + M + 12]);
+                            acc3 = vfmaq_f32(acc3, VA, VB);
                         }
+
+                        // Process remaining groups of four.
+                        for(; M + 4 <= end_M; M += 4){
+                            float32x4_t VA = vld1q_f32(&input_matrix[N * input_features + M]);
+                            float32x4_t VB = vld1q_f32(&weight_matrix[K * input_features + M]);
+                            acc0 = vfmaq_f32(acc0, VA, VB);
+                        }
+
+                        // Combine the accumulators, then reduce to one scalar.
+                        float32x4_t combined = vaddq_f32(
+                            vaddq_f32(acc0, acc1),
+                            vaddq_f32(acc2, acc3));
                         
-                        float32_t sum = vaddvq_f32(acc);
+                        float sum = vaddvq_f32(combined);
 
                         //add left over contribution if M isn't aligned
                         for(;M < end_M; M++){
-                            sum += input_matrix[N * input_features + M] *
-                                weight_matrix[K * input_features + M];
+                            sum += input_matrix[N * input_features + M] * weight_matrix[K * input_features + M];
                         }
 
                         output1[N * output_features + K ] += sum;
@@ -131,23 +156,47 @@ vector<float> Fused_GEMM_ReLU(vector<float>& input_matrix,const vector<int64_t> 
                     for(int64_t K = KK; K < end_K; K++){
 
                         //variable sums stores 4 32bit float numbers (init to zero's)
-                        float32x4_t acc = vdupq_n_f32(0.0f);
-                        int64_t M = MM;
-                        for(; M +4 <= end_M; M+=4){
-                             //load 4 32bit floats into both vector registers 
-                            float32x4_t VA  =  vld1q_f32(&input_matrix[N * input_features + M]);
-                            float32x4_t VB  =  vld1q_f32(&weight_matrix[K * input_features + M]);
+                        float32x4_t acc0 = vdupq_n_f32(0.0f);
+                        float32x4_t acc1 = vdupq_n_f32(0.0f);
+                        float32x4_t acc2 = vdupq_n_f32(0.0f);
+                        float32x4_t acc3 = vdupq_n_f32(0.0f);
 
-                            //multiply VA * VB  and ADD to sum
-                            acc = vfmaq_f32(acc, VA, VB);
+                        int64_t M = MM;
+                        for(; M + 16 <= end_M; M += 16){
+                            float32x4_t VA = vld1q_f32(&input_matrix[N * input_features + M]);
+                            float32x4_t VB = vld1q_f32(&weight_matrix[K * input_features + M]);
+                            acc0 = vfmaq_f32(acc0, VA, VB);
+
+                            VA = vld1q_f32(&input_matrix[N * input_features + M + 4]);
+                            VB = vld1q_f32(&weight_matrix[K * input_features + M + 4]);
+                            acc1 = vfmaq_f32(acc1, VA, VB);
+
+                            VA = vld1q_f32(&input_matrix[N * input_features + M + 8]);
+                            VB = vld1q_f32(&weight_matrix[K * input_features + M + 8]);
+                            acc2 = vfmaq_f32(acc2, VA, VB);
+
+                            VA = vld1q_f32(&input_matrix[N * input_features + M + 12]);
+                            VB = vld1q_f32(&weight_matrix[K * input_features + M + 12]);
+                            acc3 = vfmaq_f32(acc3, VA, VB);
                         }
+
+                        // Process remaining groups of four.
+                        for(; M + 4 <= end_M; M += 4){
+                            float32x4_t VA = vld1q_f32(&input_matrix[N * input_features + M]);
+                            float32x4_t VB = vld1q_f32(&weight_matrix[K * input_features + M]);
+                            acc0 = vfmaq_f32(acc0, VA, VB);
+                        }
+
+                        // Combine the accumulators, then reduce to one scalar.
+                        float32x4_t combined = vaddq_f32(
+                            vaddq_f32(acc0, acc1),
+                            vaddq_f32(acc2, acc3));
                         
-                        float32_t sum = vaddvq_f32(acc);
+                        float sum = vaddvq_f32(combined);
 
                         //add left over contribution if M isn't aligned
                         for(;M < end_M; M++){
-                            sum += input_matrix[N * input_features + M] *
-                                weight_matrix[K * input_features + M];
+                            sum += input_matrix[N * input_features + M] * weight_matrix[K * input_features + M];
                         }
 
                         output1[N * output_features + K ] += sum;
@@ -190,16 +239,45 @@ vector<float> Fused_GEMM_Softmax(vector<float>& input_matrix,
                 int64_t end_M = min<int64_t>(MM + block_M, input_features);
                 for(int64_t N = NN; N < end_N; N++){
                     for(int64_t K = KK; K < end_K; K++){
-                        float32x4_t acc = vdupq_n_f32(0.0f);
+                        float32x4_t acc0 = vdupq_n_f32(0.0f);
+                        float32x4_t acc1 = vdupq_n_f32(0.0f);
+                        float32x4_t acc2 = vdupq_n_f32(0.0f);
+                        float32x4_t acc3 = vdupq_n_f32(0.0f);
+
                         int64_t M = MM;
+                        for(; M + 16 <= end_M; M += 16){
+                            float32x4_t VA = vld1q_f32(&input_matrix[N * input_features + M]);
+                            float32x4_t VB = vld1q_f32(&weight_matrix[K * input_features + M]);
+                            acc0 = vfmaq_f32(acc0, VA, VB);
+
+                            VA = vld1q_f32(&input_matrix[N * input_features + M + 4]);
+                            VB = vld1q_f32(&weight_matrix[K * input_features + M + 4]);
+                            acc1 = vfmaq_f32(acc1, VA, VB);
+
+                            VA = vld1q_f32(&input_matrix[N * input_features + M + 8]);
+                            VB = vld1q_f32(&weight_matrix[K * input_features + M + 8]);
+                            acc2 = vfmaq_f32(acc2, VA, VB);
+
+                            VA = vld1q_f32(&input_matrix[N * input_features + M + 12]);
+                            VB = vld1q_f32(&weight_matrix[K * input_features + M + 12]);
+                            acc3 = vfmaq_f32(acc3, VA, VB);
+                        }
+
+                        // Process remaining groups of four.
                         for(; M + 4 <= end_M; M += 4){
                             float32x4_t VA = vld1q_f32(
                                 &input_matrix[N * input_features + M]);
                             float32x4_t VB = vld1q_f32(
                                 &weight_matrix[K * input_features + M]);
-                            acc = vfmaq_f32(acc, VA, VB);
+                            acc0 = vfmaq_f32(acc0, VA, VB);
                         }
-                        float sum = vaddvq_f32(acc);
+
+                        // Combine the accumulators, then reduce to one scalar.
+                        float32x4_t combined = vaddq_f32(
+                            vaddq_f32(acc0, acc1),
+                            vaddq_f32(acc2, acc3));
+                        float sum = vaddvq_f32(combined);
+
                         for(; M < end_M; M++){
                             sum += input_matrix[N * input_features + M] *
                                    weight_matrix[K * input_features + M];

@@ -6,6 +6,7 @@ TinyInfer,Cache-blocked Gemm,tiny_mlp,1x4,1,10000,2.3847,5.64415
 TinyInfer,ARM NEON,tiny_mlp,1x4,1,10000,2.49099,5.40331
 TinyInfer,Gemm bias ReLU fusion + operation-record plan,tiny_mlp,1x4,1,10000,1.26411,10.64749
 TinyInfer,Gemm bias Softmax fusion,tiny_mlp,1x4,1,10000,0.906346,14.85040
+TinyInfer,Feature Reduction w Arm Neon,tiny_mlp,1x4,1,10000,0.928921,14.48950
 TinyInfer,Memory reuse,tiny_mlp,1x4,1,10000,,
 TinyInfer,Precomputed execution plan,tiny_mlp,1x4,1,10000,,
 Torchinductor,Compiled Python API single thread,tiny_mlp,1x4,1,10000,14.92176,0.90201
@@ -17,6 +18,7 @@ TinyInfer,Cache-blocked Gemm,large_mlp,32x256,1,10000,1125.13,19.27733
 TinyInfer,ARM NEON,large_mlp,32x256,1,10000,624.824,34.71298
 TinyInfer,Gemm bias ReLU fusion + operation-record plan,large_mlp,32x256,1,10000,601.372,36.06669
 TinyInfer,Gemm bias Softmax fusion,large_mlp,32x256,1,10000,592.1404,36.62898
+TinyInfer,Feature Reduction w Arm Neon,large_mlp,32x256,1,10000,433.081,50.08186
 TinyInfer,Memory reuse,large_mlp,32x256,1,10000,,
 TinyInfer,Precomputed execution plan,large_mlp,32x256,1,10000,,
 Torchinductor,Compiled Python API single thread,large_mlp,32x256,1,10000,52.30971,414.63621

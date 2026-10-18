@@ -26,7 +26,7 @@ int main()
     setofkernels.insert("Softmax");
 
     // store the path of the model tinyinfer will use.  <----- LOAD MODEL
-    string model_path = "Models/large_mlp.onnx";
+    string model_path = "Models/tiny_mlp.onnx";
 
     // open ONNX file for reading in binary mode
     ifstream model_file(model_path, ios::binary);
