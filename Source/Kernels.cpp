@@ -30,14 +30,77 @@ vector<float> GEMM(vector<float>& input_matrix,const vector<int64_t> &input_dim,
 
                 // Accumulate this block into the output.
                 for(int64_t N = NN; N < end_N; N++){
-                    for(int64_t K = KK; K < end_K; K++){
+                    int64_t K = KK;
+                    for(; K + 1 < end_K; K += 2){
+                        float32x4_t acc0 = vdupq_n_f32(0.0f);
+                        float32x4_t acc1 = vdupq_n_f32(0.0f);
+                        float32x4_t acc2 = vdupq_n_f32(0.0f);
+                        float32x4_t acc3 = vdupq_n_f32(0.0f);
+
+                        //more accumulator register so we can compute 2 outputs in parallel
+                        float32x4_t acc4 = vdupq_n_f32(0.0f);
+                        float32x4_t acc5 = vdupq_n_f32(0.0f);
+                        float32x4_t acc6 = vdupq_n_f32(0.0f);
+                        float32x4_t acc7 = vdupq_n_f32(0.0f);
+
+                        //same input row but 2 different weight rows for the 2 outputs
+                        const float* input = &input_matrix[N * input_features];
+                        const float* weight0 = &weight_matrix[K * input_features];
+                        const float* weight1 = &weight_matrix[(K + 1) * input_features];
+
+                        int64_t M = MM;
+                        for(; M + 16 <= end_M; M += 16){
+                            //load input once and reuse it with both weight rows
+                            float32x4_t VA = vld1q_f32(input + M);
+                            acc0 = vfmaq_f32(acc0, VA, vld1q_f32(weight0 + M));
+                            acc4 = vfmaq_f32(acc4, VA, vld1q_f32(weight1 + M));
+
+                            VA = vld1q_f32(input + M + 4);
+                            acc1 = vfmaq_f32(acc1, VA, vld1q_f32(weight0 + M + 4));
+                            acc5 = vfmaq_f32(acc5, VA, vld1q_f32(weight1 + M + 4));
+
+                            VA = vld1q_f32(input + M + 8);
+                            acc2 = vfmaq_f32(acc2, VA, vld1q_f32(weight0 + M + 8));
+                            acc6 = vfmaq_f32(acc6, VA, vld1q_f32(weight1 + M + 8));
+
+                            VA = vld1q_f32(input + M + 12);
+                            acc3 = vfmaq_f32(acc3, VA, vld1q_f32(weight0 + M + 12));
+                            acc7 = vfmaq_f32(acc7, VA, vld1q_f32(weight1 + M + 12));
+                        }
+
+                        // Process remaining groups of four.
+                        for(; M + 4 <= end_M; M += 4){
+                            float32x4_t VA = vld1q_f32(input + M);
+                            acc0 = vfmaq_f32(acc0, VA, vld1q_f32(weight0 + M));
+                            acc4 = vfmaq_f32(acc4, VA, vld1q_f32(weight1 + M));
+                        }
+
+                        // Combine the accumulators, then reduce to one scalar per output.
+                        float sum0 = vaddvq_f32(
+                            vaddq_f32(vaddq_f32(acc0, acc1), vaddq_f32(acc2, acc3)));
+                        float sum1 = vaddvq_f32(
+                            vaddq_f32(vaddq_f32(acc4, acc5), vaddq_f32(acc6, acc7)));
+
+                        //add left over contribution if M isn't aligned
+                        for(; M < end_M; M++){
+                            float value = input[M];
+                            sum0 += value * weight0[M];
+                            sum1 += value * weight1[M];
+                        }
+
+                        //add this input feature tile's contribution to both outputs
+                        output1[N * output_features + K] += sum0;
+                        output1[N * output_features + K + 1] += sum1;
+                    }
+
+                    //calculate the last output separately if the tile has an odd number of columns
+                    for(; K < end_K; K++){
 
                         //variable sums stores 4 32bit float numbers (init to zero's)
                         float32x4_t acc0 = vdupq_n_f32(0.0f);
                         float32x4_t acc1 = vdupq_n_f32(0.0f);
                         float32x4_t acc2 = vdupq_n_f32(0.0f);
                         float32x4_t acc3 = vdupq_n_f32(0.0f);
-
 
                         int64_t M = MM;
                         for(; M + 16 <= end_M; M += 16){
@@ -80,7 +143,10 @@ vector<float> GEMM(vector<float>& input_matrix,const vector<int64_t> &input_dim,
                         output1[N * output_features + K ] += sum;
                     }
                 }
+
             }
+
+
         }
     }
 
@@ -153,7 +219,71 @@ vector<float> Fused_GEMM_ReLU(vector<float>& input_matrix,const vector<int64_t> 
 
                 // Accumulate this block into the output.
                 for(int64_t N = NN; N < end_N; N++){
-                    for(int64_t K = KK; K < end_K; K++){
+                    int64_t K = KK;
+                    for(; K + 1 < end_K; K += 2){
+                        float32x4_t acc0 = vdupq_n_f32(0.0f);
+                        float32x4_t acc1 = vdupq_n_f32(0.0f);
+                        float32x4_t acc2 = vdupq_n_f32(0.0f);
+                        float32x4_t acc3 = vdupq_n_f32(0.0f);
+
+                        //more accumulator register so we can compute 2 outputs in parallel
+                        float32x4_t acc4 = vdupq_n_f32(0.0f);
+                        float32x4_t acc5 = vdupq_n_f32(0.0f);
+                        float32x4_t acc6 = vdupq_n_f32(0.0f);
+                        float32x4_t acc7 = vdupq_n_f32(0.0f);
+
+                        //same input row but 2 different weight rows for the 2 outputs
+                        const float* input = &input_matrix[N * input_features];
+                        const float* weight0 = &weight_matrix[K * input_features];
+                        const float* weight1 = &weight_matrix[(K + 1) * input_features];
+
+                        int64_t M = MM;
+                        for(; M + 16 <= end_M; M += 16){
+                            //load input once and reuse it with both weight rows
+                            float32x4_t VA = vld1q_f32(input + M);
+                            acc0 = vfmaq_f32(acc0, VA, vld1q_f32(weight0 + M));
+                            acc4 = vfmaq_f32(acc4, VA, vld1q_f32(weight1 + M));
+
+                            VA = vld1q_f32(input + M + 4);
+                            acc1 = vfmaq_f32(acc1, VA, vld1q_f32(weight0 + M + 4));
+                            acc5 = vfmaq_f32(acc5, VA, vld1q_f32(weight1 + M + 4));
+
+                            VA = vld1q_f32(input + M + 8);
+                            acc2 = vfmaq_f32(acc2, VA, vld1q_f32(weight0 + M + 8));
+                            acc6 = vfmaq_f32(acc6, VA, vld1q_f32(weight1 + M + 8));
+
+                            VA = vld1q_f32(input + M + 12);
+                            acc3 = vfmaq_f32(acc3, VA, vld1q_f32(weight0 + M + 12));
+                            acc7 = vfmaq_f32(acc7, VA, vld1q_f32(weight1 + M + 12));
+                        }
+
+                        // Process remaining groups of four.
+                        for(; M + 4 <= end_M; M += 4){
+                            float32x4_t VA = vld1q_f32(input + M);
+                            acc0 = vfmaq_f32(acc0, VA, vld1q_f32(weight0 + M));
+                            acc4 = vfmaq_f32(acc4, VA, vld1q_f32(weight1 + M));
+                        }
+
+                        // Combine the accumulators, then reduce to one scalar per output.
+                        float sum0 = vaddvq_f32(
+                            vaddq_f32(vaddq_f32(acc0, acc1), vaddq_f32(acc2, acc3)));
+                        float sum1 = vaddvq_f32(
+                            vaddq_f32(vaddq_f32(acc4, acc5), vaddq_f32(acc6, acc7)));
+
+                        //add left over contribution if M isn't aligned
+                        for(; M < end_M; M++){
+                            float value = input[M];
+                            sum0 += value * weight0[M];
+                            sum1 += value * weight1[M];
+                        }
+
+                        //add this input feature tile's contribution to both outputs
+                        output1[N * output_features + K] += sum0;
+                        output1[N * output_features + K + 1] += sum1;
+                    }
+
+                    //calculate the last output separately if the tile has an odd number of columns
+                    for(; K < end_K; K++){
 
                         //variable sums stores 4 32bit float numbers (init to zero's)
                         float32x4_t acc0 = vdupq_n_f32(0.0f);
@@ -237,8 +367,76 @@ vector<float> Fused_GEMM_Softmax(vector<float>& input_matrix,
             int64_t end_K = min<int64_t>(KK + block_K, output_features);
             for(int64_t MM = 0; MM < input_features; MM += block_M){
                 int64_t end_M = min<int64_t>(MM + block_M, input_features);
+
+
                 for(int64_t N = NN; N < end_N; N++){
-                    for(int64_t K = KK; K < end_K; K++){
+                    int64_t K = KK;
+                    for(; K + 1 < end_K; K += 2){
+                        float32x4_t acc0 = vdupq_n_f32(0.0f);
+                        float32x4_t acc1 = vdupq_n_f32(0.0f);
+                        float32x4_t acc2 = vdupq_n_f32(0.0f);
+                        float32x4_t acc3 = vdupq_n_f32(0.0f);
+
+                        //more accumulator register so we can compute 2 outputs in parallel
+                        float32x4_t acc4 = vdupq_n_f32(0.0f);
+                        float32x4_t acc5 = vdupq_n_f32(0.0f);
+                        float32x4_t acc6 = vdupq_n_f32(0.0f);
+                        float32x4_t acc7 = vdupq_n_f32(0.0f);
+
+                        //same input row but 2 different weight rows for the 2 outputs
+                        const float* input = &input_matrix[N * input_features];
+                        const float* weight0 = &weight_matrix[K * input_features];
+                        const float* weight1 = &weight_matrix[(K + 1) * input_features];
+
+                        int64_t M = MM;
+                        for(; M + 16 <= end_M; M += 16){
+                            //load input once and reuse it with both weight rows
+                            float32x4_t VA = vld1q_f32(input + M);
+                            acc0 = vfmaq_f32(acc0, VA, vld1q_f32(weight0 + M));
+                            acc4 = vfmaq_f32(acc4, VA, vld1q_f32(weight1 + M));
+
+                            VA = vld1q_f32(input + M + 4);
+                            acc1 = vfmaq_f32(acc1, VA, vld1q_f32(weight0 + M + 4));
+                            acc5 = vfmaq_f32(acc5, VA, vld1q_f32(weight1 + M + 4));
+
+                            VA = vld1q_f32(input + M + 8);
+                            acc2 = vfmaq_f32(acc2, VA, vld1q_f32(weight0 + M + 8));
+                            acc6 = vfmaq_f32(acc6, VA, vld1q_f32(weight1 + M + 8));
+
+                            VA = vld1q_f32(input + M + 12);
+                            acc3 = vfmaq_f32(acc3, VA, vld1q_f32(weight0 + M + 12));
+                            acc7 = vfmaq_f32(acc7, VA, vld1q_f32(weight1 + M + 12));
+                        }
+
+                        // Process remaining groups of four.
+                        for(; M + 4 <= end_M; M += 4){
+                            float32x4_t VA = vld1q_f32(input + M);
+                            acc0 = vfmaq_f32(acc0, VA, vld1q_f32(weight0 + M));
+                            acc4 = vfmaq_f32(acc4, VA, vld1q_f32(weight1 + M));
+                        }
+
+                        // Combine the accumulators, then reduce to one scalar per output.
+                        float sum0 = vaddvq_f32(
+                            vaddq_f32(vaddq_f32(acc0, acc1), vaddq_f32(acc2, acc3)));
+                        float sum1 = vaddvq_f32(
+                            vaddq_f32(vaddq_f32(acc4, acc5), vaddq_f32(acc6, acc7)));
+
+                        //add left over contribution if M isn't aligned
+                        for(; M < end_M; M++){
+                            float value = input[M];
+                            sum0 += value * weight0[M];
+                            sum1 += value * weight1[M];
+                        }
+
+                        //add this input feature tile's contribution to both outputs
+                        output[N * output_features + K] += sum0;
+                        output[N * output_features + K + 1] += sum1;
+                    }
+
+                    //calculate the last output separately if the tile has an odd number of columns
+                    for(; K < end_K; K++){
+
+                        //variable sums stores 4 32bit float numbers (init to zero's)
                         float32x4_t acc0 = vdupq_n_f32(0.0f);
                         float32x4_t acc1 = vdupq_n_f32(0.0f);
                         float32x4_t acc2 = vdupq_n_f32(0.0f);
@@ -265,10 +463,8 @@ vector<float> Fused_GEMM_Softmax(vector<float>& input_matrix,
 
                         // Process remaining groups of four.
                         for(; M + 4 <= end_M; M += 4){
-                            float32x4_t VA = vld1q_f32(
-                                &input_matrix[N * input_features + M]);
-                            float32x4_t VB = vld1q_f32(
-                                &weight_matrix[K * input_features + M]);
+                            float32x4_t VA = vld1q_f32(&input_matrix[N * input_features + M]);
+                            float32x4_t VB = vld1q_f32(&weight_matrix[K * input_features + M]);
                             acc0 = vfmaq_f32(acc0, VA, VB);
                         }
 
@@ -276,13 +472,15 @@ vector<float> Fused_GEMM_Softmax(vector<float>& input_matrix,
                         float32x4_t combined = vaddq_f32(
                             vaddq_f32(acc0, acc1),
                             vaddq_f32(acc2, acc3));
+
                         float sum = vaddvq_f32(combined);
 
-                        for(; M < end_M; M++){
-                            sum += input_matrix[N * input_features + M] *
-                                   weight_matrix[K * input_features + M];
+                        //add left over contribution if M isn't aligned
+                        for(;M < end_M; M++){
+                            sum += input_matrix[N * input_features + M] * weight_matrix[K * input_features + M];
                         }
-                        output[N * output_features + K] += sum;
+
+                        output[N * output_features + K ] += sum;
                     }
                 }
             }

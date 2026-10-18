@@ -1,5 +1,20 @@
 # AI Handoff
 
+## Tiny Register-Blocking Result Recorded (2026-10-18)
+- Recorded the median of seven user-reported tiny_mlp runs: 0.684763, 0.940183, 0.8681, 0.901858, 0.986313, 0.883733, 0.826179 us per inference. Each is a 10,000-iteration average; all displayed correctness checks passed. Median: 0.883733 us; speedup versus the original 13.4596 us baseline: 15.23039. Used the median consistently with prior repeated tiny-model measurements.
+- Updated only the tiny Register blocking measurement. No implementation changes or new benchmark runs.
+
+## Large Register-Blocking Result Recorded (2026-10-18)
+- Recorded the mean of two user-reported post-build large_mlp runs: 312.459 and 313.945 us per inference, each over 10,000 iterations. Both runs reported correctness passing. Mean: 313.202 us; speedup versus the original 21689.5 us baseline: 69.25083. Excluded the pre-build 433.1 us run.
+- Updated only the large Register blocking measurement. Tiny remains unmeasured for this stage. No new benchmark runs or implementation changes.
+
+## Two-Output Register Blocking (2026-10-18)
+- Reviewed the user's paired-output GEMM. Fixed writes to undeclared output (the GEMM buffer is output1) and restored the single-column fallback for odd output widths. The paired feature calculations were correct. Fused_GEMM_Softmax had an empty multiplication loop in the user's working copy.
+- Applied the same two-output calculation to Fused_GEMM_ReLU and Fused_GEMM_Softmax, preserving the user's comments and original outer tile order. Each input-vector load is shared by two outputs, each with four accumulators. All three kernels handle 16-feature groups, four-wide tails, scalar tails, and odd final output columns. Bias/ReLU/row-wise Softmax placement is unchanged.
+- Partial outputs still use += after each MM tile. This change shares input loads within tiles; it does not yet retain accumulators across MM tiles.
+- Temporary review harness in /private/tmp/tinyinfer-review.bOcBwc/review.cpp passed 19 shapes including both large MLP layer sizes, direct double-reference GEMM checks, fused/unfused comparisons, stable Softmax reference and row sums, and both model plans with repeated inference and fusion guards. Passed both AddressSanitizer/UndefinedBehaviorSanitizer and normal -O3 builds.
+- Existing standalone Softmax axis=0 limitation and ReLU signed/unsigned warning remain. No benchmark values, model fixtures, or user executables were changed. Run make to rebuild before timing.
+
 ## Four-Accumulator Results Recorded (2026-10-18)
 - Filled the user's renamed Feature Reduction w Arm Neon rows in Benchmarks/results.csv. Tiny uses the median of five user-reported 10,000-inference averages: 1.3327, 0.812229, 0.871121, 0.933787, 0.928921 us. Median: 0.928921 us; speedup versus original tiny baseline: 14.48950.
 - Large uses the single user-reported result after rebuilding: 433.081 us; speedup versus original large baseline: 50.08186. The earlier 585.107 us was measured before rebuilding and is not used for this optimization.
