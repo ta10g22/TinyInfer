@@ -4,3 +4,14 @@
 # Local project notes and editor settings
 /[Dd]ocs/
 /.vscode/
+
+# macOS metadata and generated build files
+.DS_Store
+/Tinyinfer
+/onnx_benchmark
+*.dSYM/
+*.o
+
+# Python caches
+__pycache__/
+*.pyc
