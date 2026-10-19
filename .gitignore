@@ -1,2 +1,6 @@
 .venv/
 .venv-benchmark/
+
+# Local project notes and editor settings
+/[Dd]ocs/
+/.vscode/

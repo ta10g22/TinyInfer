@@ -9,17 +9,15 @@ using namespace std;
 
 
 // kernel for General Matrix Multiplication
-vector<float> GEMM(vector<float>& input_matrix, const vector<int64_t>& input_dim,
+void GEMM(vector<float>& input_matrix, const vector<int64_t>& input_dim,
     vector<float>& weight_matrix, const vector<int64_t>& weight_dim,
-    vector<float>& bias){
+    vector<float>& bias, vector<float>& output1){
     int batch_size = input_dim[0];
     int input_features = input_dim[1];
     int output_features = weight_dim[0];
     int64_t block_N = 8;
     int64_t block_K = 32;
     int64_t block_M = 32;
-
-    vector<float> output1(batch_size * output_features, 0.0f);
 
     //keep the outer output tiles, but finish each output pair before moving on
     for(int64_t NN = 0; NN < batch_size; NN += block_N){
@@ -145,7 +143,6 @@ vector<float> GEMM(vector<float>& input_matrix, const vector<int64_t>& input_dim
             output1[N * output_features + K] += bias[K];
         }
     }
-    return output1;
 }
 
 
@@ -187,15 +184,14 @@ void Softmax(vector<float>& input, const vector<int64_t>& dim){
 }
 
 
-vector<float> Fused_GEMM_ReLU(vector<float>& input_matrix,const vector<int64_t> &input_dim, vector<float>& weight_matrix,const vector<int64_t>& weight_dim, vector<float>& bias){
+void Fused_GEMM_ReLU(vector<float>& input_matrix,const vector<int64_t> &input_dim, vector<float>& weight_matrix,const vector<int64_t>& weight_dim, vector<float>& bias,
+    vector<float>& output1){
     int batch_size = input_dim[0];
     int input_features = input_dim[1];
     int output_features = weight_dim[0];
     int64_t block_N = 8;
     int64_t block_K = 32;
     int64_t block_M = 32;
-
-    vector<float> output1(batch_size * output_features, 0.0f);
 
     //keep the outer output tiles, but finish each output pair before moving on
     for(int64_t NN = 0; NN < batch_size; NN += block_N){
@@ -324,12 +320,12 @@ vector<float> Fused_GEMM_ReLU(vector<float>& input_matrix,const vector<int64_t> 
         }
         }
     }
-    return output1;  
 }
 
-vector<float> Fused_GEMM_Softmax(vector<float>& input_matrix,
+void Fused_GEMM_Softmax(vector<float>& input_matrix,
     const vector<int64_t>& input_dim, vector<float>& weight_matrix,
-    const vector<int64_t>& weight_dim, vector<float>& bias){
+    const vector<int64_t>& weight_dim, vector<float>& bias,
+    vector<float>& output){
 
     int64_t batch_size = input_dim[0];
     int64_t input_features = input_dim[1];
@@ -337,8 +333,6 @@ vector<float> Fused_GEMM_Softmax(vector<float>& input_matrix,
     int64_t block_N = 8;
     int64_t block_K = 32;
     int64_t block_M = 32;
-
-    vector<float> output(batch_size * output_features, 0.0f);
 
     //keep the outer output tiles, but finish each output pair before moving on
     for(int64_t NN = 0; NN < batch_size; NN += block_N){
@@ -476,5 +470,4 @@ vector<float> Fused_GEMM_Softmax(vector<float>& input_matrix,
             }
         }
     }
-    return output;
 }

@@ -75,6 +75,9 @@ int main()
     // Loop through the onnx graph and find nodes we can fuse (Data reuse optimization)
     vector<onnx_node> optimized_graph = onnx_optimize(modelproto);
 
+    //allocate output tensors once so every inference can reuse them
+    prepare_output_tensors(optimized_graph, Tensor_map);
+
     // warm up (to ensure code and data are already in CPU caches
     for (int i = 0; i < 100; i++)
     {

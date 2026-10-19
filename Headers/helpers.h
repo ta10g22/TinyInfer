@@ -64,6 +64,9 @@ bool load_input(
 );
 
 
+void prepare_output_tensors(const vector<onnx_node>& optimized_graph,
+                            unordered_map<string, Tensor>& Tensor_map);
+
 void run_graph(const vector<onnx_node>& optimized_graph,
                unordered_map<string, Tensor>& Tensor_map
 );

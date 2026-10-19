@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <cstring>
+#include <algorithm>
 
 #include <onnx/onnx_pb.h>
 
@@ -164,6 +165,43 @@ vector<onnx_node> onnx_optimize(const onnx::ModelProto& modelproto){
 }
 
 
+void prepare_output_tensors(const vector<onnx_node>& optimized_graph,
+                            unordered_map<string, Tensor>& Tensor_map){
+    //follow execution order so each input shape is available before its output
+    for(const auto& node : optimized_graph){
+        const string& input = node.input_names.at(0);
+        const string& output = node.output_names.at(0);
+        vector<int64_t> dim;
+
+        if(node.op_type == "Gemm" || node.op_type == "Fused_GEMM_ReLU" || node.op_type == "Fused_GEMM_Softmax"){
+            dim = {
+                Tensor_map.at(input).get_tensor_dimension().at(0),
+                Tensor_map.at(node.input_names.at(1)).get_tensor_dimension().at(0)
+            };
+        }
+        else if(node.op_type == "Relu" || node.op_type == "Softmax"){
+            dim = Tensor_map.at(input).get_tensor_dimension();
+        }
+        else{
+            throw runtime_error("Unsupported operation: " + node.op_type);
+        }
+
+        if(Tensor_map.contains(output)){
+            throw runtime_error("Output tensor already exists: " + output);
+        }
+
+        size_t output_size = 1;
+        for(int64_t dimension : dim){
+            if(dimension <= 0 || static_cast<size_t>(dimension) > vector<float>().max_size() / output_size){
+                throw runtime_error("Invalid output dimensions for " + output);
+            }
+            output_size *= static_cast<size_t>(dimension);
+        }
+        Tensor_map.emplace(output, Tensor(vector<float>(output_size, 0.0f), dim));
+    }
+}
+
+
 void run_graph(const vector<onnx_node>& optimized_graph,
                unordered_map<string, Tensor>& Tensor_map){
     for(const auto& node : optimized_graph){
@@ -178,48 +216,43 @@ void run_graph(const vector<onnx_node>& optimized_graph,
             Tensor& weight_tensor = Tensor_map.at(weight);
             Tensor& bias_tensor = Tensor_map.at(bias);
 
-            vector<int64_t> dim = {
-                input_tensor.get_tensor_dimension()[0],
-                weight_tensor.get_tensor_dimension()[0]
-            };
-
-            vector<float> output_vector;
+            vector<float>& output_vector = Tensor_map.at(output).get_tensor_vector();
 
             if(node.op_type == "Fused_GEMM_ReLU"){
-                output_vector = Fused_GEMM_ReLU(
+                Fused_GEMM_ReLU(
                     input_tensor.get_tensor_vector(),
                     input_tensor.get_tensor_dimension(),
                     weight_tensor.get_tensor_vector(),
                     weight_tensor.get_tensor_dimension(),
-                    bias_tensor.get_tensor_vector());
+                    bias_tensor.get_tensor_vector(), output_vector);
             }
 
             else if(node.op_type == "Fused_GEMM_Softmax"){
-                output_vector = Fused_GEMM_Softmax(
+                Fused_GEMM_Softmax(
                     input_tensor.get_tensor_vector(),
                     input_tensor.get_tensor_dimension(),
                     weight_tensor.get_tensor_vector(),
                     weight_tensor.get_tensor_dimension(),
-                    bias_tensor.get_tensor_vector());
+                    bias_tensor.get_tensor_vector(), output_vector);
             }
 
             else{
-                output_vector = GEMM(
+                GEMM(
                     input_tensor.get_tensor_vector(),
                     input_tensor.get_tensor_dimension(),
                     weight_tensor.get_tensor_vector(),
                     weight_tensor.get_tensor_dimension(),
-                    bias_tensor.get_tensor_vector());
+                    bias_tensor.get_tensor_vector(), output_vector);
             }
 
-            Tensor_map.erase(output);
-            Tensor_map.insert({output, Tensor(output_vector, dim)});
         }
         else if(node.op_type == "Relu" || node.op_type == "Softmax"){
-            vector<float> output_vector =
-                Tensor_map.at(input).get_const_tensor_vector();
-            vector<int64_t> dim =
-                Tensor_map.at(input).get_tensor_dimension();
+            const vector<float>& input_vector = Tensor_map.at(input).get_const_tensor_vector();
+            vector<float>& output_vector = Tensor_map.at(output).get_tensor_vector();
+            const vector<int64_t>& dim = Tensor_map.at(output).get_tensor_dimension();
+
+            //keep the input intact because another operation may still need it
+            copy(input_vector.begin(), input_vector.end(), output_vector.begin());
 
             if(node.op_type == "Relu"){
                 ReLU(output_vector);
@@ -228,8 +261,6 @@ void run_graph(const vector<onnx_node>& optimized_graph,
                 Softmax(output_vector, dim);
             }
 
-            Tensor_map.erase(output);
-            Tensor_map.insert({output, Tensor(output_vector, dim)});
         }
         else{
             throw runtime_error("Unsupported operation: " + node.op_type);
